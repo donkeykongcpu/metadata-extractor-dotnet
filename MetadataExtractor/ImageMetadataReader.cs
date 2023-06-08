@@ -12,6 +12,7 @@ using MetadataExtractor.Formats.Jpeg;
 using MetadataExtractor.Formats.Mpeg;
 using MetadataExtractor.Formats.Netpbm;
 using MetadataExtractor.Formats.Pcx;
+using MetadataExtractor.Formats.Pdf;
 using MetadataExtractor.Formats.Photoshop;
 using MetadataExtractor.Formats.Png;
 using MetadataExtractor.Formats.QuickTime;
@@ -90,6 +91,7 @@ namespace MetadataExtractor
                 FileType.Netpbm    => new Directory[] { NetpbmMetadataReader.ReadMetadata(stream) },
                 FileType.Orf       => TiffMetadataReader.ReadMetadata(stream),
                 FileType.Pcx       => new Directory[] { PcxMetadataReader.ReadMetadata(stream) },
+                FileType.Pdf       => PdfMetadataReader.ReadMetadata(stream),
                 FileType.Png       => PngMetadataReader.ReadMetadata(stream),
                 FileType.Psd       => PsdMetadataReader.ReadMetadata(stream),
                 FileType.QuickTime => QuickTimeMetadataReader.ReadMetadata(stream),

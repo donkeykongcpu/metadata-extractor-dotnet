@@ -88,7 +88,10 @@ namespace MetadataExtractor.Util
         Heif = 26,
 
         /// <summary>MPEG-4 Part 14.</summary>
-        Mp4 = 27
+        Mp4 = 27,
+
+        /// <summary>Portable Document Format.</summary>
+        Pdf = 28,
     }
 
     public static class FileTypeExtensions
@@ -122,7 +125,8 @@ namespace MetadataExtractor.Util
             "TGA",
             "MP3",
             "HEIC",
-            "MP4"
+            "MP4",
+            "PDF"
         };
 
         private static readonly string[] _longNames =
@@ -155,6 +159,7 @@ namespace MetadataExtractor.Util
             "MPEG Audio Layer III",
             "High Efficiency Image File Format",
             "MPEG-4 Part 14",
+            "Portable Document Format"
         };
 
         private static readonly string?[] _mimeTypes =
@@ -187,6 +192,7 @@ namespace MetadataExtractor.Util
             "audio/mpeg",
             "image/heic",
             "video/mp4",
+            "application/pdf"
         };
 
         private static readonly string[]?[] _extensions =
@@ -218,7 +224,8 @@ namespace MetadataExtractor.Util
             new[] { "tga", "icb", "vda", "vst" },
             new[] { "mp3" },
             new[] { "heic", "heif", "avci" },
-            new[] { "mp4", "m4a", "m4p", "m4b", "m4r", "m4v" }
+            new[] { "mp4", "m4a", "m4p", "m4b", "m4r", "m4v" },
+            new [] { "pdf" }
         };
 
         public static string GetName(this FileType fileType)
