@@ -39,66 +39,45 @@ namespace MetadataExtractor.Formats.Pdf
     /// <author>Kevin Mott https://github.com/kwhopper</author>
     public sealed class PdfReader
     {
+        private static byte[] PreambleBytes { get; } = Encoding.ASCII.GetBytes("%PDF-");
+
         private int _previousTag;
 
         public DirectoryList Extract(Stream inputStream)
         {
-            IndexedReader reader = new IndexedSeekingReader(inputStream);
             var directory = new PdfDirectory();
-            var epsDirectories = new List<Directory>() { directory };
+            var pdfDirectories = new List<Directory>() { directory };
 
-            // 0xC5D0D3C6 signifies an EPS Header block which contains 32-bytes of basic information
-            // 0x25215053 (%!PS) signifies an EPS File and leads straight into the PostScript
+            // %PDF-1.N signifies a PDF File Header, where N is a digit between 0 and 7
 
             int startingPosition = (int)inputStream.Position;
 
-            switch (reader.GetInt32(0))
+            var buffer = new byte[PreambleBytes.Length + 3];
+
+            int read = inputStream.Read(buffer, 0, PreambleBytes.Length + 3);
+
+            if (read < PreambleBytes.Length + 3 || !buffer.StartsWith(PreambleBytes))
             {
-                case unchecked((int)0xC5D0D3C6):
-                    reader = reader.WithByteOrder(isMotorolaByteOrder: false);
-                    int postScriptOffset = reader.GetInt32(4);
-                    int postScriptLength = reader.GetInt32(8);
-                    int wmfOffset = reader.GetInt32(12);
-                    int wmfSize = reader.GetInt32(16);
-                    int tifOffset = reader.GetInt32(20);
-                    int tifSize = reader.GetInt32(24);
-                    //int checkSum = reader.getInt32(28);
+                directory.AddError("File type not supported.");
+            }
+            else
+            {
+                if (TryDecimalToInt(buffer[5]) >= 0 && buffer[6] == '.' && TryDecimalToInt(buffer[7]) >= 0)
+                {
+                    var version = Encoding.ASCII.GetString(buffer, 5, 3); // if version >= 1.4, /Version entry takes precedence
 
-                    // Get Tiff/WMF preview data if applicable
-                    if (tifSize != 0)
-                    {
-                        directory.Set(PdfDirectory.TagTiffPreviewSize, tifSize);
-                        directory.Set(PdfDirectory.TagTiffPreviewOffset, tifOffset);
-                        // Get Tiff metadata
-                        try
-                        {
-                            ByteArrayReader byteArrayReader = new(reader.GetBytes(tifOffset, tifSize));
-                            TiffReader.ProcessTiff(byteArrayReader, new PhotoshopTiffHandler(epsDirectories));
-                        }
-                        catch (TiffProcessingException ex)
-                        {
-                            directory.AddError("Unable to process TIFF data: " + ex.Message);
-                        }
-                    }
-                    else if (wmfSize != 0)
-                    {
-                        directory.Set(PdfDirectory.TagWmfPreviewSize, wmfSize);
-                        directory.Set(PdfDirectory.TagWmfPreviewOffset, wmfOffset);
-                    }
+                    directory.Set(PdfDirectory.TagVersion, version);
 
-                    // TODO avoid allocating byte array here -- read directly from InputStream
-                    Extract(directory, epsDirectories, new SequentialByteArrayReader(reader.GetBytes(postScriptOffset, postScriptLength)));
-                    break;
-                case 0x25215053:
                     inputStream.Position = startingPosition;
-                    Extract(directory, epsDirectories, new SequentialStreamReader(inputStream));
-                    break;
-                default:
-                    directory.AddError("File type not supported.");
-                    break;
+                    Extract(directory, pdfDirectories, new SequentialStreamReader(inputStream));
+                }
+                else
+                {
+                    directory.AddError("Missing PDF version in header.");
+                }
             }
 
-            return epsDirectories;
+            return pdfDirectories;
         }
 
         /// <summary>
@@ -413,6 +392,17 @@ namespace MetadataExtractor.Formats.Pdf
                 b = reader.GetByte();
 
             return bytes.ToArray();
+        }
+
+        /// <summary>
+        /// Treats a byte as an ASCII character, and returns its numerical value in decimal.
+        /// If conversion is not possible, returns -1.
+        /// </summary>
+        private static int TryDecimalToInt(byte b)
+        {
+            if (b >= '0' && b <= '9')
+                return b - '0';
+            return -1;
         }
 
         /// <summary>
