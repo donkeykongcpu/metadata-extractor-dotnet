@@ -27,6 +27,16 @@ namespace MetadataExtractor.Formats.Pdf
             { TagStartXref,      "StartXref" },
         };
 
+        internal static readonly Dictionary<string, int> TagIntegerMap = new()
+        {
+            { "/Size", TagSize },
+            { "/Prev", TagPrev },
+            { "/Root", TagRoot },
+            { "/Encrypt", TagEncrypt },
+            { "/Info", TagInfo },
+            { "/ID", TagID },
+        };
+
         public PdfFileTrailerDirectory() : base(_tagNameMap)
         {
             SetDescriptor(new TagDescriptor<PdfFileTrailerDirectory>(this));
