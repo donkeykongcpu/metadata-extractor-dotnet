@@ -41,6 +41,10 @@ namespace MetadataExtractor.Formats.Pdf
     {
         private static byte[] PreambleBytes { get; } = Encoding.ASCII.GetBytes("%PDF-");
 
+        private static char[] _whitespaceChars = new byte[] { 0x00, 0x09, 0x0A, 0x0C, 0x0D, 0x20 }.Select(b => (char)b).ToArray();
+
+        private static char[] _tokenSeparatorChars = new byte[] { 0x00, 0x09, 0x0C, 0x20 }.Select(b => (char)b).ToArray();
+
         private int _previousTag;
 
         public DirectoryList Extract(Stream inputStream)
@@ -265,6 +269,60 @@ namespace MetadataExtractor.Formats.Pdf
             }
 
             return bytes.ToArray();
+        }
+
+        private static List<List<string>> ReadFromEndUntil(IndexedReader reader, string sentinel)
+        {
+            var line = new List<string>();
+            var token = new StringBuilder();
+            int index = (int)reader.Length - 1;
+
+            var result = new List<List<string>> { line };
+
+            while (index >= 0)
+            {
+                var nextByte = reader.GetByte(index);
+
+                if (nextByte == '\r' || nextByte == '\n')
+                {
+                    // add current token to current line and start new line and new token
+                    if (token.Length > 0)
+                    {
+                        line.Add(new string(token.ToString().ToCharArray().Reverse().ToArray()));
+                    }
+                    line.Reverse();
+
+                    if (line.Count > 0 && line[0] == sentinel)
+                    {
+                        break;
+                    }
+
+                    line = new List<string>();
+                    result.Add(line);
+                    token = new StringBuilder();
+                }
+                else if (_tokenSeparatorChars.Contains((char)nextByte))
+                {
+                    // add current token to current line and start new token
+                    if (token.Length > 0)
+                    {
+                        line.Add(new string(token.ToString().ToCharArray().Reverse().ToArray()));
+                    }
+
+                    token = new StringBuilder();
+                }
+                else
+                {
+                    // add to current token
+                    token.Append((char)nextByte);
+                }
+
+                index--;
+            }
+
+            result.Reverse();
+
+            return result.Where(line => line.Count > 0).ToList(); // excluding lines with no tokens
         }
 
         /**
