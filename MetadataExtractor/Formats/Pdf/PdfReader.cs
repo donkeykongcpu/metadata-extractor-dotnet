@@ -247,6 +247,44 @@ namespace MetadataExtractor.Formats.Pdf
             directories.Add(new XmpReader().Extract(xmp));
         }
 
+        private static Dictionary<string, string> ParseDictionary(IEnumerable<string> lineTokens)
+        {
+            Dictionary<string, string> result = new Dictionary<string, string>();
+
+            string? name = null;
+
+            List<string> value = new List<string>();
+
+            foreach (string token in lineTokens)
+            {
+                if (token == "<<" || token == ">>")
+                {
+                    continue;
+                }
+                else if (token.StartsWith("/"))
+                {
+                    if (name is not null)
+                    {
+                        result[name] = string.Join(" ", value.ToArray());
+                    }
+
+                    value.Clear();
+                    name = token;
+                }
+                else
+                {
+                    value.Add(token);
+                }
+            }
+
+            if (name is not null)
+            {
+                result[name] = string.Join(" ", value.ToArray());
+            }
+
+            return result;
+        }
+
         /// <summary>
         /// Reads all bytes until the given sentinel is observed.
         /// The sentinel will be included in the returned bytes.
