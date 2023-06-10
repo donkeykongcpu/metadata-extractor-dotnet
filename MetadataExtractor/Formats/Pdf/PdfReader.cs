@@ -13,6 +13,34 @@ using DirectoryList = System.Collections.Generic.IReadOnlyList<MetadataExtractor
 
 namespace MetadataExtractor.Formats.Pdf
 {
+    /// <summary>
+    /// Models object references found in the Cross-Reference (Xref) Table via <see cref="PdfReader.ProcessAtoms"/>.
+    /// </summary>
+    internal sealed class XrefEntry
+    {
+        /// <summary>
+        /// Gets the sequential object number.
+        /// </summary>
+        public uint ObjectNumber { get; }
+
+        /// <summary>
+        /// Gets the 10-digit decimal number indicating the byte offset within the file.
+        /// </summary>
+        public long Offset { get; }
+
+        /// <summary>
+        /// The 5-digit generation number. The maximum generation number is 65,535.
+        /// </summary>
+        public ushort Generation { get; }
+
+        public XrefEntry(uint objectNumber, long offset, ushort generation)
+        {
+            ObjectNumber = objectNumber;
+            Offset = offset;
+            Generation = generation;
+        }
+    }
+
     /// <summary>Reads file passed in through SequentialReader and parses encountered data:</summary>
     /// <remarks>
     /// <list type="bullet">
