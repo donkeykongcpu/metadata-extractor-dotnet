@@ -275,6 +275,73 @@ namespace MetadataExtractor.Formats.Pdf
             directories.Add(new XmpReader().Extract(xmp));
         }
 
+        private object? ExtractIndirectObject(IndexedReader reader, XrefEntry[] xrefTable, string[] tokens)
+        {
+            // there should be exactly 3 tokens: objectNumber generation "R"
+            // the keyword "R" indicates an indirect reference
+
+            if (tokens.Length == 3 && tokens[2] == "R")
+            {
+                uint objectNumber = uint.Parse(tokens[0]);
+                ushort generation = ushort.Parse(tokens[1]);
+
+                XrefEntry? reference = xrefTable[objectNumber];
+
+                if (reference is not null && reference.Generation == generation)
+                {
+                    var lineTokens = ExtractIndirectObject(reader, (int)reference.Offset, objectNumber, generation);
+                    return ParseDictionary(lineTokens);
+                }
+            }
+            else if (tokens.Length >= 4 && tokens[2] == "obj" && tokens[tokens.Length - 1] == "endobj")
+            {
+                // the object can be specified inline, using at least 4 tokens: objectNumber generation "obj" ... "endobj"
+                List<string> remaining = tokens.Skip(3).Take(tokens.Length - 4).ToList();
+                return ParseDictionary(remaining);
+            }
+
+            return new Dictionary<string, string[]>();
+        }
+
+        private IEnumerable<string> ExtractIndirectObject(IndexedReader reader, int index, uint cmpObjectNumber, ushort cmpGeneration)
+        {
+            // extract the object found at index, using at least 4 tokens: objectNumber generation "obj" ... "endobj"
+
+            int nextIndex = index;
+
+            var tokens = new List<string>();
+
+            uint objectNumber = reader.GetUInt32Token(ref nextIndex);
+
+            if (objectNumber != cmpObjectNumber)
+            {
+                throw new Exception("Unexpected object number");
+            }
+
+            ushort generation = reader.GetUInt16Token(ref nextIndex);
+
+            if (generation != cmpGeneration)
+            {
+                throw new Exception("Unexpected object generation");
+            }
+
+            string marker = reader.GetToken(ref nextIndex);
+
+            if (marker != "obj")
+            {
+                throw new Exception("Object marker not found");
+            }
+
+            string token;
+
+            while ((token = reader.GetToken(ref nextIndex)) != "endobj")
+            {
+                tokens.Add(token);
+            }
+
+            return tokens;
+        }
+
         private XrefEntry[] ExtractXrefTable(IndexedReader reader, int xrefOffset, int size)
         {
             var result = new XrefEntry[size];
