@@ -275,6 +275,45 @@ namespace MetadataExtractor.Formats.Pdf
             directories.Add(new XmpReader().Extract(xmp));
         }
 
+        private XrefEntry?[] ExtractXrefTable(PdfFileTrailerDirectory trailerDirectory, IndexedReader reader)
+        {
+            int xrefOffset = trailerDirectory.GetInt32(PdfFileTrailerDirectory.TagStartXref);
+
+            uint size = trailerDirectory.GetUInt32(PdfFileTrailerDirectory.TagSize);
+
+            var result = new XrefEntry?[size];
+
+            // starting at xrefOffset, we expect the "xref" marker, followed by two integers
+
+            int nextIndex = xrefOffset;
+
+            var marker = reader.GetToken(ref nextIndex);
+
+            if (marker != "xref")
+            {
+                // TODO throw or report error?
+            }
+
+            // there can be multiple subsections, each starting with two integers
+            uint firstObjectNumber, numberOfObjects;
+
+            while (reader.TryGetUInt32Token(ref nextIndex, out firstObjectNumber) && reader.TryGetUInt32Token(ref nextIndex, out numberOfObjects))
+            {
+                for (int i = 0; i < numberOfObjects; i++)
+                {
+                    var objectNumber = (uint)(firstObjectNumber + i); // zero-indexed
+                    byte[] bytes = reader.GetBytes(nextIndex + (i * 20), 20); // each entry is exactly 20 bytes long
+                    if (bytes[17] == 'f') continue; // entry is "free": don't track it
+                    long offset = long.Parse(new string(Encoding.ASCII.GetChars(bytes, 0, 10)));
+                    ushort generation = ushort.Parse(new string(Encoding.ASCII.GetChars(bytes, 11, 5)));
+                    result[objectNumber] = new XrefEntry(objectNumber, offset, generation);
+                }
+                nextIndex += (int)(numberOfObjects * 20);
+            }
+
+            return result;
+        }
+
         private static Dictionary<string, string> ParseDictionary(IEnumerable<string> lineTokens)
         {
             Dictionary<string, string> result = new Dictionary<string, string>();
