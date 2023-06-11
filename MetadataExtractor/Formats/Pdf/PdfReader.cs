@@ -275,9 +275,9 @@ namespace MetadataExtractor.Formats.Pdf
             directories.Add(new XmpReader().Extract(xmp));
         }
 
-        private XrefEntry?[] ExtractXrefTable(IndexedReader reader, int xrefOffset, int size)
+        private XrefEntry[] ExtractXrefTable(IndexedReader reader, int xrefOffset, int size)
         {
-            var result = new XrefEntry?[size];
+            var result = new XrefEntry[size];
 
             // starting at xrefOffset, we expect the "xref" marker, followed by two integers
 
