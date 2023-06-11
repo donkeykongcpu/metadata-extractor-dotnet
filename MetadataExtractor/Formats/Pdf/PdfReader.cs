@@ -275,35 +275,7 @@ namespace MetadataExtractor.Formats.Pdf
             directories.Add(new XmpReader().Extract(xmp));
         }
 
-        private object? ExtractIndirectObject(IndexedReader reader, XrefEntry[] xrefTable, string[] tokens)
-        {
-            // there should be exactly 3 tokens: objectNumber generation "R"
-            // the keyword "R" indicates an indirect reference
-
-            if (tokens.Length == 3 && tokens[2] == "R")
-            {
-                uint objectNumber = uint.Parse(tokens[0]);
-                ushort generation = ushort.Parse(tokens[1]);
-
-                XrefEntry? reference = xrefTable[objectNumber];
-
-                if (reference is not null && reference.Generation == generation)
-                {
-                    var lineTokens = ExtractIndirectObject(reader, (int)reference.Offset, objectNumber, generation);
-                    return ParseDictionary(lineTokens);
-                }
-            }
-            else if (tokens.Length >= 4 && tokens[2] == "obj" && tokens[tokens.Length - 1] == "endobj")
-            {
-                // the object can be specified inline, using at least 4 tokens: objectNumber generation "obj" ... "endobj"
-                List<string> remaining = tokens.Skip(3).Take(tokens.Length - 4).ToList();
-                return ParseDictionary(remaining);
-            }
-
-            return new Dictionary<string, string[]>();
-        }
-
-        private IEnumerable<string> ExtractIndirectObject(IndexedReader reader, int index, uint cmpObjectNumber, ushort cmpGeneration)
+        private static string[] ExtractIndirectObject(IndexedReader reader, int index, uint cmpObjectNumber, ushort cmpGeneration)
         {
             // extract the object found at index, using at least 4 tokens: objectNumber generation "obj" ... "endobj"
 
@@ -339,7 +311,7 @@ namespace MetadataExtractor.Formats.Pdf
                 tokens.Add(token);
             }
 
-            return tokens;
+            return tokens.ToArray();
         }
 
         private XrefEntry[] ExtractXrefTable(IndexedReader reader, int xrefOffset, int size)
@@ -375,6 +347,119 @@ namespace MetadataExtractor.Formats.Pdf
             }
 
             return result;
+        }
+
+        private static object? ParseObject(IndexedReader reader, XrefEntry[] xrefTable, string[] tokens)
+        {
+            if (tokens is null || tokens.Length == 0)
+            {
+                return null;
+            }
+
+            // first check if we have an indirect reference to an object
+            // if so, there should be exactly 3 tokens: objectNumber generation "R" (the keyword "R" indicates an indirect reference)
+            if (tokens.Length == 3 && tokens[2] == "R")
+            {
+                uint objectNumber = uint.Parse(tokens[0]);
+                ushort generation = ushort.Parse(tokens[1]);
+
+                XrefEntry? reference = xrefTable[objectNumber];
+
+                if (reference is not null && reference.Generation == generation)
+                {
+                    var remainingTokens = ExtractIndirectObject(reader, (int)reference.Offset, objectNumber, generation);
+                    return ParseObject(reader, xrefTable, remainingTokens);
+                }
+                else
+                {
+                    return null;
+                }
+            }
+            else if (tokens.Length >= 4 && tokens[2] == "obj" && tokens[tokens.Length - 1] == "endobj")
+            {
+                // alternatively, the object can be specified inline, using at least 4 tokens: objectNumber generation "obj" ... "endobj"
+                var remainingTokens = tokens.Skip(3).Take(tokens.Length - 4).ToArray();
+                return ParseObject(reader, xrefTable, remainingTokens);
+            }
+
+            var firstToken = tokens.First();
+
+            // check single-token values first (Null, Boolean, Numeric, Name)
+
+            if (tokens.Length == 1)
+            {
+                switch (firstToken)
+                {
+                    case "null": return null;
+                    case "true": return true;
+                    case "false": return false;
+                }
+
+                if (int.TryParse(firstToken, out var intValue))
+                {
+                    return intValue;
+                }
+
+                if (decimal.TryParse(firstToken, out var decimalValue))
+                {
+                    return decimalValue;
+                }
+
+                if (firstToken.StartsWith("/"))
+                {
+                    return ParseName(firstToken);
+                }
+            }
+
+            // then check Array, Dictionary, Stream objects
+
+            if (firstToken.StartsWith("<<"))
+            {
+                return ParseDictionary(reader, xrefTable, tokens);
+            }
+            else if (firstToken.StartsWith("["))
+            {
+                return ParseArray(reader, xrefTable, tokens);
+            }
+            else if (firstToken.StartsWith("("))
+            {
+                return ParseLiteralString(tokens);
+            }
+            else if (firstToken.StartsWith("<"))
+            {
+                return ParseHexadecimalString(tokens);
+            }
+
+            // TODO add ParseStream
+
+            return "UNKNOWN: " + string.Join(" ", tokens.ToArray()); // unknown value
+        }
+
+        private static string ParseName(string token)
+        {
+            return token; // TODO finish this
+        }
+
+        private static string ParseLiteralString(IEnumerable<string> tokens)
+        {
+            return "LITERAL STRING: " + string.Join(" ", tokens.ToArray());
+        }
+
+        private static string ParseHexadecimalString(IEnumerable<string> tokens)
+        {
+            return "HEX STRING: " + string.Join(" ", tokens.ToArray());
+        }
+
+        private static IEnumerable<object?> ParseArray(IndexedReader reader, XrefEntry[] xrefTable, IEnumerable<string> tokens)
+        {
+            return tokens.Select(token => ParseObject(reader, xrefTable, new string[] { token })); // TODO not sure if these are necessary
+        }
+
+        private static Dictionary<string, object?> ParseDictionary(IndexedReader reader, XrefEntry[] xrefTable, IEnumerable<string> tokens)
+        {
+            var tokenDictionary = ParseTokenDictionary(tokens);
+
+            return tokenDictionary.ToDictionary(item => ParseName(item.Key), item => ParseObject(reader, xrefTable, item.Value));
         }
 
         private static Dictionary<string, string[]> ParseTokenDictionary(IEnumerable<string> tokens)
