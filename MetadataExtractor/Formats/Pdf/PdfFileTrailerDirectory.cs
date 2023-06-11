@@ -5,14 +5,12 @@ namespace MetadataExtractor.Formats.Pdf
     [SuppressMessage("ReSharper", "MemberCanBePrivate.Global")]
     public sealed class PdfFileTrailerDirectory : Directory
     {
-        public const int TagSize = 1;
+        public const int TagSize = 1; // the total number of entries in the file's Cross-Reference Table
         public const int TagPrev = 2;
         public const int TagRoot = 3;
         public const int TagEncrypt = 4;
         public const int TagInfo = 5;
         public const int TagID = 6;
-        public const int TagStartXref = 7;
-
 
         public override string Name => "PDF File Trailer";
 
@@ -24,7 +22,6 @@ namespace MetadataExtractor.Formats.Pdf
             { TagEncrypt,        "Encrypt" },
             { TagInfo,           "Info" },
             { TagID,             "ID" },
-            { TagStartXref,      "StartXref" },
         };
 
         internal static readonly Dictionary<string, int> TagIntegerMap = new()
