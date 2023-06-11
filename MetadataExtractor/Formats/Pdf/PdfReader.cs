@@ -336,14 +336,15 @@ namespace MetadataExtractor.Formats.Pdf
             {
                 for (int i = 0; i < numberOfObjects; i++)
                 {
+                    // each entry is supposed to be exactly 20 bytes long (according to the spec),
+                    // but some sample files have 19-byte entries (omitting a byte for the end-of-line marker)
                     var objectNumber = (uint)(firstObjectNumber + i); // zero-indexed
-                    byte[] bytes = reader.GetBytes(nextIndex + (i * 20), 20); // each entry is exactly 20 bytes long
-                    if (bytes[17] == 'f') continue; // entry is "free": don't track it
-                    long offset = long.Parse(new string(Encoding.ASCII.GetChars(bytes, 0, 10)));
-                    ushort generation = ushort.Parse(new string(Encoding.ASCII.GetChars(bytes, 11, 5)));
+                    long offset = long.Parse(reader.GetToken(ref nextIndex));
+                    ushort generation = ushort.Parse(reader.GetToken(ref nextIndex));
+                    var usageMarker = reader.GetToken(ref nextIndex);
+                    if (usageMarker == "f") continue; // entry is "free": don't track it
                     result[objectNumber] = new XrefEntry(objectNumber, offset, generation);
                 }
-                nextIndex += (int)(numberOfObjects * 20);
             }
 
             return result;
