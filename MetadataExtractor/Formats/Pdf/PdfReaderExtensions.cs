@@ -34,6 +34,20 @@ namespace MetadataExtractor.Formats.Pdf
             return sb.ToString();
         }
 
+        public static bool TryGetToken(this IndexedReader reader, ref int nextIndex, out string result)
+        {
+            try
+            {
+                result = reader.GetToken(ref nextIndex);
+                return true;
+            }
+            catch (Exception)
+            {
+                result = string.Empty;
+                return false;
+            }
+        }
+
         public static ushort GetUInt16Token(this IndexedReader reader, ref int index)
         {
             return ushort.Parse(reader.GetToken(ref index));
