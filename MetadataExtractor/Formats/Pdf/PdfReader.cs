@@ -377,15 +377,21 @@ namespace MetadataExtractor.Formats.Pdf
             return result;
         }
 
-        private static Dictionary<string, string[]> ParseDictionary(IEnumerable<string> lineTokens)
+        private static Dictionary<string, string[]> ParseTokenDictionary(IEnumerable<string> tokens)
         {
-            Dictionary<string, string[]> result = new Dictionary<string, string[]>();
+            // we need to extract the /Size and /Prev integer values from the trailer,
+            // in order to build the Cross-Reference Table
+
+            // because the Cross-Reference Table is not yet built,
+            // we cannot extract indirect references yet (e.g. /Root, /Info, etc.)
+
+            var result = new Dictionary<string, string[]>();
 
             string? name = null;
 
-            List<string> value = new List<string>();
+            var value = new List<string>();
 
-            foreach (string token in lineTokens)
+            foreach (var token in tokens)
             {
                 if (token == "<<")
                 {
