@@ -275,12 +275,8 @@ namespace MetadataExtractor.Formats.Pdf
             directories.Add(new XmpReader().Extract(xmp));
         }
 
-        private XrefEntry?[] ExtractXrefTable(PdfFileTrailerDirectory trailerDirectory, IndexedReader reader)
+        private XrefEntry?[] ExtractXrefTable(IndexedReader reader, int xrefOffset, int size)
         {
-            int xrefOffset = trailerDirectory.GetInt32(PdfFileTrailerDirectory.TagStartXref);
-
-            uint size = trailerDirectory.GetUInt32(PdfFileTrailerDirectory.TagSize);
-
             var result = new XrefEntry?[size];
 
             // starting at xrefOffset, we expect the "xref" marker, followed by two integers
