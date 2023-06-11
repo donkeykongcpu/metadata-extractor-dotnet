@@ -310,9 +310,9 @@ namespace MetadataExtractor.Formats.Pdf
             return result;
         }
 
-        private static Dictionary<string, string> ParseDictionary(IEnumerable<string> lineTokens)
+        private static Dictionary<string, string[]> ParseDictionary(IEnumerable<string> lineTokens)
         {
-            Dictionary<string, string> result = new Dictionary<string, string>();
+            Dictionary<string, string[]> result = new Dictionary<string, string[]>();
 
             string? name = null;
 
@@ -328,7 +328,7 @@ namespace MetadataExtractor.Formats.Pdf
                 {
                     if (name is not null)
                     {
-                        result[name] = string.Join(" ", value.ToArray());
+                        result[name] = value.ToArray();
                     }
 
                     value.Clear();
@@ -342,7 +342,7 @@ namespace MetadataExtractor.Formats.Pdf
 
             if (name is not null)
             {
-                result[name] = string.Join(" ", value.ToArray());
+                result[name] = value.ToArray();
             }
 
             return result;
