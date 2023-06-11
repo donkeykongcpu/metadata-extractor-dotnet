@@ -310,50 +310,6 @@ namespace MetadataExtractor.Formats.Pdf
             return result;
         }
 
-        private static Dictionary<string, string[]> ParseDictionary(IndexedReader reader, int index)
-        {
-            Dictionary<string, string[]> result = new Dictionary<string, string[]>();
-
-            string? name = null;
-
-            List<string> value = new List<string>();
-
-            int nextIndex = index;
-
-            while (reader.TryGetToken(ref nextIndex, out string token))
-            {
-                if (token == "<<")
-                {
-                    continue;
-                }
-                else if (token == ">>")
-                {
-                    break;
-                }
-                else if (token.StartsWith("/"))
-                {
-                    if (name is not null)
-                    {
-                        result[name] = value.ToArray();
-                    }
-
-                    value.Clear();
-                    name = token;
-                }
-                else
-                {
-                    value.Add(token);
-                }
-            }
-
-            if (name is not null)
-            {
-                result[name] = value.ToArray();
-            }
-
-            return result;
-        }
-
         private static Dictionary<string, string[]> ParseDictionary(IEnumerable<string> lineTokens)
         {
             Dictionary<string, string[]> result = new Dictionary<string, string[]>();
