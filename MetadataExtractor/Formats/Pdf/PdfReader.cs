@@ -477,6 +477,8 @@ namespace MetadataExtractor.Formats.Pdf
 
             var value = new List<string>();
 
+            var nameAsValueAllowed = false;
+
             foreach (var token in tokens)
             {
                 if (token == "<<")
@@ -489,21 +491,32 @@ namespace MetadataExtractor.Formats.Pdf
                 }
                 else if (token.StartsWith("/"))
                 {
-                    if (name is not null)
+                    if (nameAsValueAllowed)
                     {
-                        result[name] = value.ToArray();
+                        // this name token is being used as a value
+                        value.Add(token);
+                        nameAsValueAllowed = false;
                     }
-
-                    value.Clear();
-                    name = token;
+                    else
+                    {
+                        // this name token is being used as a key
+                        if (name is not null && value.Count > 0)
+                        {
+                            result[name] = value.ToArray();
+                        }
+                        value.Clear();
+                        name = token;
+                        nameAsValueAllowed = true;
+                    }
                 }
                 else
                 {
                     value.Add(token);
+                    nameAsValueAllowed = false;
                 }
             }
 
-            if (name is not null)
+            if (name is not null && value.Count > 0)
             {
                 result[name] = value.ToArray();
             }
