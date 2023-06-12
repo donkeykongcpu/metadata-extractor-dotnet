@@ -83,6 +83,41 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
+    internal class PdfString : PdfObject
+    {
+        private readonly List<string> _tokens;
+
+        private readonly PdfString? _parent;
+
+        public string Type => "string";
+
+        public PdfString(PdfString? parent)
+        {
+            _tokens = new List<string>();
+            _parent = parent;
+        }
+
+        public object? GetValue()
+        {
+            return string.Join(" ", _tokens.ToArray());
+        }
+
+        public void Add(object? value)
+        {
+            string? token = value as string;
+            if (token is null || token == string.Empty)
+            {
+                return;
+            }
+            PdfString? rootString = this;
+            while (rootString._parent is not null)
+            {
+                rootString = rootString._parent;
+            }
+            rootString._tokens.Add(token); // always add it to the root string
+        }
+    }
+
     internal class PdfArray : PdfObject
     {
         private readonly List<object?> _array;
@@ -158,6 +193,14 @@ namespace MetadataExtractor.Formats.Pdf
     {
         private readonly Stack<PdfObject> _stack;
 
+        private string ContextType
+        {
+            get
+            {
+                return _stack.Peek().Type;
+            }
+        }
+
         public ParseContext()
         {
             _stack = new Stack<PdfObject>();
@@ -169,19 +212,37 @@ namespace MetadataExtractor.Formats.Pdf
             _stack.Peek().Add(value);
         }
 
-        public void StartContext(PdfObject pdfObject)
+        public void StartContext(string type)
         {
+            if (ContextType == "string" && type != "string")
+            {
+                throw new Exception("Strings can only contain other strings");
+            }
+            PdfObject pdfObject;
+            PdfString? parentString = null;
+            if (ContextType == "string")
+            {
+                parentString = _stack.Peek() as PdfString;
+            }
+            switch (type)
+            {
+                case "root": pdfObject = new PdfRoot(); break;
+                case "string": pdfObject = new PdfString(parentString); break;
+                case "array": pdfObject = new PdfArray(); break;
+                case "dictionary": pdfObject = new PdfDictionary(); break;
+                default: throw new Exception("Invalid type");
+            }
             Add(pdfObject);
             _stack.Push(pdfObject);
         }
 
         public void EndContext(string type)
         {
-            var popped = _stack.Pop();
-            if (type != popped.Type)
+            if (ContextType != type)
             {
                 throw new Exception("Context type mismatch");
             }
+            _stack.Pop();
             if (_stack.Count < 1)
             {
                 throw new Exception("Context underflow");
