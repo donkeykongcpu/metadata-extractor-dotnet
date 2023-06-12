@@ -41,6 +41,163 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
+    internal interface PdfObject
+    {
+        string Type { get; }
+
+        object? GetValue();
+
+        void Add(object? value);
+    }
+
+    internal class PdfRoot : PdfObject
+    {
+        private object? _value;
+
+        private bool _valueWasSet;
+
+        public string Type => "root";
+
+        public PdfRoot()
+        {
+            _valueWasSet = false;
+        }
+
+        public object? GetValue()
+        {
+            if (!_valueWasSet)
+            {
+                throw new Exception("Value was not set");
+            }
+            return _value;
+        }
+
+        public void Add(object? value)
+        {
+            if (_valueWasSet)
+            {
+                throw new Exception("Value already set");
+            }
+            _value = value;
+            _valueWasSet = true;
+        }
+    }
+
+    internal class PdfArray : PdfObject
+    {
+        private readonly List<object?> _array;
+
+        public string Type => "array";
+
+        public PdfArray()
+        {
+            _array = new List<object?>();
+        }
+
+        public object? GetValue()
+        {
+            return _array;
+        }
+
+        public void Add(object? value)
+        {
+            _array.Add(value);
+        }
+    }
+
+    internal class PdfDictionary : PdfObject
+    {
+        private readonly Dictionary<string, object?> _dictionary;
+        private string? _currentKey = null;
+
+        public string Type => "dictionary";
+
+        public PdfDictionary()
+        {
+            _dictionary = new Dictionary<string, object?>();
+        }
+
+        public object? GetValue()
+        {
+            return _dictionary;
+        }
+
+        public void Add(object? value)
+        {
+            if (IsName(value))
+            {
+                if (_currentKey is not null)
+                {
+                    _dictionary.Add(_currentKey, value);
+                    _currentKey = null;
+                }
+                else
+                {
+                    _currentKey = value as string;
+                }
+            }
+            else
+            {
+                if (_currentKey is null)
+                {
+                    return;
+                }
+                _dictionary.Add(_currentKey, value);
+                _currentKey = null;
+            }
+        }
+
+        private bool IsName(object? value)
+        {
+            string? token = value as string;
+            return (token is not null && token.StartsWith("/"));
+        }
+    }
+
+    internal sealed class ParseContext
+    {
+        private readonly Stack<PdfObject> _stack;
+
+        public ParseContext()
+        {
+            _stack = new Stack<PdfObject>();
+            _stack.Push(new PdfRoot());
+        }
+
+        public void Add(object? value)
+        {
+            _stack.Peek().Add(value);
+        }
+
+        public void StartContext(PdfObject pdfObject)
+        {
+            Add(pdfObject);
+            _stack.Push(pdfObject);
+        }
+
+        public void EndContext(string type)
+        {
+            var popped = _stack.Pop();
+            if (type != popped.Type)
+            {
+                throw new Exception("Context type mismatch");
+            }
+            if (_stack.Count < 1)
+            {
+                throw new Exception("Context underflow");
+            }
+        }
+
+        public object? GetValue()
+        {
+            if (_stack.Count != 1)
+            {
+                throw new Exception("Invalid context count");
+            }
+            return _stack.Peek().GetValue();
+        }
+    }
+
     /// <summary>Reads file passed in through SequentialReader and parses encountered data:</summary>
     /// <remarks>
     /// <list type="bullet">
