@@ -580,117 +580,106 @@ namespace MetadataExtractor.Formats.Pdf
             return result;
         }
 
+        private static string GetTokenAtIndex(string[] tokens, int index)
+        {
+            if (index >= tokens.Length) return string.Empty;
+            else return tokens[index];
+        }
+
         private static object? ParseObject(IndexedReader reader, XrefEntry[] xrefTable, string[] tokens)
         {
-            if (tokens is null || tokens.Length == 0)
+            var parseContext = new ParseContext();
+
+            for (int index = 0; index < tokens.Length; index++)
             {
-                return null;
-            }
+                var nextToken = tokens[index];
 
-            // first check if we have an indirect reference to an object
-            // if so, there should be exactly 3 tokens: objectNumber generation "R" (the keyword "R" indicates an indirect reference)
-            if (tokens.Length == 3 && tokens[2] == "R")
-            {
-                uint objectNumber = uint.Parse(tokens[0]);
-                ushort generation = ushort.Parse(tokens[1]);
+                // first check if we have either an indirect object (objectNumber generation "obj" ... "endobj)
+                // or an indirect reference to an object (objectNumber generation "R")
 
-                XrefEntry? reference = xrefTable[objectNumber];
-
-                if (reference is not null && reference.Generation == generation)
+                if (uint.TryParse(GetTokenAtIndex(tokens, index), out var objectNumber) && ushort.TryParse(GetTokenAtIndex(tokens, index + 1), out var generation))
                 {
-                    var remainingTokens = ExtractIndirectObject(reader, (int)reference.Offset, objectNumber, generation);
-                    return ParseObject(reader, xrefTable, remainingTokens);
+                    if (GetTokenAtIndex(tokens, index + 2) == "R")
+                    {
+                        var output = ExtractIndirectObject(reader, xrefTable, objectNumber, generation);
+                        //var output = "REF-" + objectNumber + "-" + generation;
+                        parseContext.Add(output);
+                        index += 2;
+                        continue;
+                    }
+                    else if (GetTokenAtIndex(tokens, index + 2) == "obj")
+                    {
+                        throw new NotImplementedException();
+                    }
+                }
+
+                if (nextToken == "null")
+                {
+                    parseContext.Add(null);
+                    continue;
+                }
+                else if (nextToken == "true")
+                {
+                    parseContext.Add(true);
+                    continue;
+                }
+                else if (nextToken == "false")
+                {
+                    parseContext.Add(false);
+                    continue;
+                }
+                else if (nextToken.StartsWith("/"))
+                {
+                    parseContext.Add(nextToken); // TODO this needs to be parsed as a name
+                    continue;
+                }
+                else if (int.TryParse(nextToken, out var intValue))
+                {
+                    parseContext.Add(intValue);
+                    continue;
+                }
+                else if (decimal.TryParse(nextToken, out var decimalValue))
+                {
+                    parseContext.Add(decimalValue);
+                    continue;
+                }
+                else if (nextToken.StartsWith("("))
+                {
+                    parseContext.StartContext("string"); // strings can be nested, but we flatten them
+                    continue;
+                }
+                else if (nextToken.EndsWith(")"))
+                {
+                    parseContext.EndContext("string");
+                    continue;
+                }
+                else if (nextToken.StartsWith("["))
+                {
+                    parseContext.StartContext("array");
+                    continue;
+                }
+                else if (nextToken.EndsWith("]"))
+                {
+                    parseContext.EndContext("array");
+                    continue;
+                }
+                else if (nextToken.StartsWith("<<"))
+                {
+                    parseContext.StartContext("dictionary");
+                    continue;
+                }
+                else if (nextToken.EndsWith(">>"))
+                {
+                    parseContext.EndContext("dictionary");
+                    continue;
                 }
                 else
                 {
-                    return null;
-                }
-            }
-            else if (tokens.Length >= 4 && tokens[2] == "obj" && tokens[tokens.Length - 1] == "endobj")
-            {
-                // alternatively, the object can be specified inline, using at least 4 tokens: objectNumber generation "obj" ... "endobj"
-                var remainingTokens = tokens.Skip(3).Take(tokens.Length - 4).ToArray();
-                return ParseObject(reader, xrefTable, remainingTokens);
-            }
-
-            var firstToken = tokens.First();
-
-            // check single-token values first (Null, Boolean, Numeric, Name)
-
-            if (tokens.Length == 1)
-            {
-                switch (firstToken)
-                {
-                    case "null": return null;
-                    case "true": return true;
-                    case "false": return false;
-                }
-
-                if (int.TryParse(firstToken, out var intValue))
-                {
-                    return intValue;
-                }
-
-                if (decimal.TryParse(firstToken, out var decimalValue))
-                {
-                    return decimalValue;
-                }
-
-                if (firstToken.StartsWith("/"))
-                {
-                    return ParseName(firstToken);
+                    parseContext.Add(nextToken);
                 }
             }
 
-            // then check Array, Dictionary, Stream objects
-
-            if (firstToken.StartsWith("<<"))
-            {
-                return ParseDictionary(reader, xrefTable, tokens);
-            }
-            else if (firstToken.StartsWith("["))
-            {
-                return ParseArray(reader, xrefTable, tokens);
-            }
-            else if (firstToken.StartsWith("("))
-            {
-                return ParseLiteralString(tokens);
-            }
-            else if (firstToken.StartsWith("<"))
-            {
-                return ParseHexadecimalString(tokens);
-            }
-
-            // TODO add ParseStream
-
-            return "UNKNOWN: " + string.Join(" ", tokens.ToArray()); // unknown value
-        }
-
-        private static string ParseName(string token)
-        {
-            return token; // TODO finish this
-        }
-
-        private static string ParseLiteralString(IEnumerable<string> tokens)
-        {
-            return "LITERAL STRING: " + string.Join(" ", tokens.ToArray());
-        }
-
-        private static string ParseHexadecimalString(IEnumerable<string> tokens)
-        {
-            return "HEX STRING: " + string.Join(" ", tokens.ToArray());
-        }
-
-        private static IEnumerable<object?> ParseArray(IndexedReader reader, XrefEntry[] xrefTable, IEnumerable<string> tokens)
-        {
-            return tokens.Select(token => ParseObject(reader, xrefTable, new string[] { token })); // TODO not sure if these are necessary
-        }
-
-        private static Dictionary<string, object?> ParseDictionary(IndexedReader reader, XrefEntry[] xrefTable, IEnumerable<string> tokens)
-        {
-            var tokenDictionary = ParseTokenDictionary(tokens);
-
-            return tokenDictionary.ToDictionary(item => ParseName(item.Key), item => ParseObject(reader, xrefTable, item.Value));
+            return parseContext.GetValue();
         }
 
         private static Dictionary<string, string[]> ParseTokenDictionary(IEnumerable<string> tokens)
