@@ -336,7 +336,7 @@ namespace MetadataExtractor.Formats.Pdf
             {
                 return 0;
             }
-            return DoGetByte(_index);
+            return DoGetByte(_index + delta);
         }
 
         public bool MatchDelimiter(string delimiter)
