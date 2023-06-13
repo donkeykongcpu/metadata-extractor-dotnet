@@ -105,7 +105,7 @@ namespace MetadataExtractor.Formats.Pdf
                 throw new Exception("Value was not set");
             }
 
-            return $"{_objectNumber}-{_generation}";
+            return $"{_objectNumber} {_generation}";
         }
 
         public void Add(object? value)
@@ -266,6 +266,7 @@ namespace MetadataExtractor.Formats.Pdf
             switch (type)
             {
                 case "root": pdfObject = new PdfRoot(); break;
+                case "objectref": pdfObject = new PdfObjectReference(); break;
                 case "string": pdfObject = new PdfString(parentString); break;
                 case "array": pdfObject = new PdfArray(); break;
                 case "dictionary": pdfObject = new PdfDictionary(); break;
