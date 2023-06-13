@@ -493,43 +493,55 @@ namespace MetadataExtractor.Formats.Pdf
             directories.Add(new XmpReader().Extract(xmp));
         }
 
-        private static string[] ExtractIndirectObject(IndexedReader reader, int index, uint cmpObjectNumber, ushort cmpGeneration)
+        private static object? ExtractIndirectObject(IndexedReader reader, XrefEntry[] xrefTable, uint objectNumber, ushort generation)
         {
+            var reference = xrefTable[objectNumber];
+
+            if (reference is null || reference.Generation != generation)
+            {
+                return null;
+            }
+
             // extract the object found at index, using at least 4 tokens: objectNumber generation "obj" ... "endobj"
 
-            int nextIndex = index;
+            int nextIndex = (int)reference.Offset;
 
             var tokens = new List<string>();
 
-            uint objectNumber = reader.GetUInt32Token(ref nextIndex);
+            uint cmpObjectNumber = reader.GetUInt32Token(ref nextIndex);
 
-            if (objectNumber != cmpObjectNumber)
+            if (cmpObjectNumber != objectNumber)
             {
-                throw new Exception("Unexpected object number");
+                return null; // unexpected object number
             }
 
-            ushort generation = reader.GetUInt16Token(ref nextIndex);
+            ushort cmpGeneration = reader.GetUInt16Token(ref nextIndex);
 
-            if (generation != cmpGeneration)
+            if (cmpGeneration != generation)
             {
-                throw new Exception("Unexpected object generation");
+                return null; // unexpected object generation
             }
 
             string marker = reader.GetToken(ref nextIndex);
 
             if (marker != "obj")
             {
-                throw new Exception("Object marker not found");
+                return null; // object marker not found
             }
 
             string token;
 
             while ((token = reader.GetToken(ref nextIndex)) != "endobj")
             {
+                if (token == "obj")
+                {
+                    throw new Exception("Objects cannot be nested");
+                }
+
                 tokens.Add(token);
             }
 
-            return tokens.ToArray();
+            return ParseObject(reader, xrefTable, tokens.ToArray());
         }
 
         private XrefEntry[] ExtractXrefTable(IndexedReader reader, int xrefOffset, int size)
