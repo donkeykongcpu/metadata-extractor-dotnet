@@ -298,6 +298,125 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
+    internal abstract class ByteProvider
+    {
+        private int _index;
+
+        protected abstract int Length { get; }
+
+        protected ByteProvider(int index)
+        {
+            _index = index;
+        }
+
+        public bool HasNextByte()
+        {
+            return (_index < Length);
+        }
+
+        public byte GetNextByte()
+        {
+            if (_index >= Length)
+            {
+                return 0;
+            }
+            byte result = DoGetByte(_index);
+            _index++;
+            return result;
+        }
+
+        public byte PeekByte(int delta)
+        {
+            if (_index + delta < 0)
+            {
+                return 0;
+            }
+            if (_index + delta >= Length)
+            {
+                return 0;
+            }
+            return DoGetByte(_index);
+        }
+
+        public bool MatchDelimiter(string delimiter)
+        {
+            byte[] needle = Encoding.ASCII.GetBytes(delimiter.ToCharArray());
+            for (int i = 0; i < needle.Length; i++)
+            {
+                if (needle[i] != PeekByte(i))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        public void Consume(int count)
+        {
+            if (_index + count >= Length)
+            {
+                _index = Length;
+            }
+            else
+            {
+                _index += count;
+            }
+        }
+
+        protected abstract byte DoGetByte(int index);
+    }
+
+    internal class StringByteProvider : ByteProvider
+    {
+        private readonly byte[] _input;
+
+        protected override int Length => _input.Length;
+
+        public StringByteProvider(string input)
+            : base(index: 0)
+        {
+            _input = Encoding.UTF8.GetBytes(input);
+        }
+
+        protected override byte DoGetByte(int index)
+        {
+            return _input[index];
+        }
+
+    }
+
+    internal class StreamByteProvider : ByteProvider
+    {
+        private readonly IndexedReader _reader;
+
+        protected override int Length => (int)_reader.Length;
+
+        public StreamByteProvider(IndexedReader reader, int index)
+            : base(index: index)
+        {
+            _reader = reader;
+        }
+
+        protected override byte DoGetByte(int index)
+        {
+            return _reader.GetByte(index);
+        }
+
+    }
+
+    internal sealed class TokeniseContext
+    {
+        public string Type { get; }
+
+        public int BalancingCounter { get; set; }
+
+        public TokeniseContext(string type)
+        {
+            Type = type;
+            BalancingCounter = 0;
+        }
+    }
+
     /// <summary>Reads file passed in through SequentialReader and parses encountered data:</summary>
     /// <remarks>
     /// <list type="bullet">
