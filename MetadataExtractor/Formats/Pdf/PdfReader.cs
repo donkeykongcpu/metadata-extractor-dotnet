@@ -83,6 +83,45 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
+    internal class PdfObjectReference : PdfObject
+    {
+        private uint _objectNumber;
+
+        private ushort _generation;
+
+        private bool _valueWasSet;
+
+        public string Type => "objectref";
+
+        public PdfObjectReference()
+        {
+            _valueWasSet = false;
+        }
+
+        public object? GetValue()
+        {
+            if (!_valueWasSet)
+            {
+                throw new Exception("Value was not set");
+            }
+
+            return $"{_objectNumber}-{_generation}";
+        }
+
+        public void Add(object? value)
+        {
+            string? token = value as string;
+            if (token is null || token == string.Empty)
+            {
+                return;
+            }
+            string[] tokens = token.Split(' ');
+            _objectNumber = uint.Parse(tokens[0]);
+            _generation = ushort.Parse(tokens[1]);
+            _valueWasSet = true;
+        }
+    }
+
     internal class PdfString : PdfObject
     {
         private readonly List<string> _tokens;
@@ -601,9 +640,9 @@ namespace MetadataExtractor.Formats.Pdf
                 {
                     if (GetTokenAtIndex(tokens, index + 2) == "R")
                     {
-                        var output = ExtractIndirectObject(reader, xrefTable, objectNumber, generation);
-                        //var output = "REF-" + objectNumber + "-" + generation;
-                        parseContext.Add(output);
+                        parseContext.StartContext("objectref");
+                        parseContext.Add(objectNumber + " " + generation);
+                        parseContext.EndContext("objectref");
                         index += 2;
                         continue;
                     }
