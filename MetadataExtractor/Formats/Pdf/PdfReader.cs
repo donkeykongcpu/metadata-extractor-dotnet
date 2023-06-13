@@ -364,6 +364,29 @@ namespace MetadataExtractor.Formats.Pdf
             }
         }
 
+        public bool TryGetOctalDigit(int delta, out int result)
+        {
+            try
+            {
+                byte test = PeekByte(delta);
+                if (test >= (byte)'0' && test <= (byte)'7')
+                {
+                    result = test - (byte)'0';
+                    return true;
+                }
+                else
+                {
+                    result = 0;
+                    return false;
+                }
+            }
+            catch (Exception)
+            {
+                result = 0;
+                return false;
+            }
+        }
+
         protected abstract byte DoGetByte(int index);
     }
 
@@ -1059,6 +1082,34 @@ namespace MetadataExtractor.Formats.Pdf
                                 // \CRLF => ignored
                                 provider.Consume(2);
                             }
+                            else if (provider.TryGetOctalDigit(0, out int digit1))
+                            {
+                                // octal character codes
+                                // can consist of one, two or three digits
+                                // high-order overflow shall be ignored
+                                List<int> digits = new List<int> { digit1 };
+
+                                if (provider.TryGetOctalDigit(1, out int digit2))
+                                {
+                                    digits.Add(digit2);
+                                    provider.Consume(1);
+                                }
+
+                                if (provider.TryGetOctalDigit(1, out int digit3))
+                                {
+                                    digits.Add(digit3);
+                                    provider.Consume(1);
+                                }
+
+                                int value = 0;
+                                int power = 0;
+                                for (int i = digits.Count() - 1; i >= 0; i--)
+                                {
+                                    value += digits[i] * (int)Math.Pow(8, power++);
+                                }
+                                byte coerced = (byte)value;
+                                token.Append((char)coerced); // TODO: NOT A CHAR!
+                            }
                             else
                             {
                                 switch (peekByte)
@@ -1073,12 +1124,9 @@ namespace MetadataExtractor.Formats.Pdf
                                     case (byte)'\\': token.Append('\\'); provider.Consume(1); break;
                                     case (byte)'\n': provider.Consume(1); break; // \LF => ignored
                                     case (byte)'\r': provider.Consume(1); break; // \CR => ignored
-
-                                    default: break; // ignore the reverse solidus (\)
-                                                    // TODO octal character codes
+                                    default: break; // ignore \ and process next byte
                                 }
                             }
-
                         }
                         else
                         {
