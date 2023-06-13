@@ -980,6 +980,129 @@ namespace MetadataExtractor.Formats.Pdf
             return result.Where(line => line.Count > 0).ToList(); // excluding lines with no tokens
         }
 
+        private IEnumerable<string> Tokenise(ByteProvider provider)
+        {
+            Stack<TokeniseContext> context = new Stack<TokeniseContext>();
+
+            context.Push(new TokeniseContext("root")); // make sure stack is never empty
+
+            StringBuilder token = new StringBuilder();
+
+            int counter = 0;
+
+            while (provider.HasNextByte())
+            {
+                if (counter++ > 1000) yield break;
+
+                char test = (char)provider.PeekByte(0);
+
+                if (provider.PeekByte(0) == (byte)'\\')
+                {
+                    byte peekByte = provider.PeekByte(1);
+                    if (peekByte == (byte)'\r' && provider.PeekByte(2) == (byte)'\n')
+                    {
+                        // \CRLF => ignored
+                        provider.Consume(3);
+                    }
+                    else
+                    {
+                        switch (peekByte)
+                        {
+                            case (byte)'n': token.Append('\n'); provider.Consume(2); break;
+                            case (byte)'r': token.Append('\r'); provider.Consume(2); break;
+                            case (byte)'t': token.Append('\t'); provider.Consume(2); break;
+                            case (byte)'b': token.Append('\b'); provider.Consume(2); break;
+                            case (byte)'f': token.Append('\f'); provider.Consume(2); break;
+                            case (byte)'(': token.Append('('); provider.Consume(2); break;
+                            case (byte)')': token.Append(')'); provider.Consume(2); break;
+                            case (byte)'\\': token.Append('\\'); provider.Consume(2); break;
+                            case (byte)'\n': provider.Consume(2); break; // \\n => ignored
+                            case (byte)'\r': provider.Consume(2); break; // \\r => ignored
+
+                            default: provider.Consume(1); break; // ignore the reverse solidus (\)
+                                                                 // TODO octal character codes
+                        }
+                    }
+
+                }
+                else if (provider.MatchDelimiter("("))
+                {
+                    provider.Consume(1);
+                    if (context.Peek().Type != "literal-string")
+                    {
+                        context.Push(new TokeniseContext("literal-string"));
+                        context.Peek().BalancingCounter++;
+                        yield return "(";
+                    }
+                    else
+                    {
+                        context.Peek().BalancingCounter++;
+                        token.Append("(");
+                    }
+                }
+                else if (provider.MatchDelimiter(")"))
+                {
+                    provider.Consume(1);
+                    context.Peek().BalancingCounter--;
+                    if (context.Peek().BalancingCounter == 0)
+                    {
+                        context.Pop();
+                        string newToken = token.ToString();
+#if NET35
+                        token = new StringBuilder();
+#else
+                        token.Clear();
+#endif
+                        yield return newToken;
+                        yield return ")";
+                    }
+                    else
+                    {
+                        token.Append(")");
+                    }
+                }
+                else
+                {
+                    byte nextByte = provider.GetNextByte();
+
+                    if (context.Peek().Type == "literal-string")
+                    {
+                        // keep all characters within string
+
+                        // CRLF => LF
+                        if (nextByte == (byte)'\r' && provider.PeekByte(0) == (byte)'\n')
+                        {
+                            token.Append('\n');
+                            provider.Consume(1);
+                        }
+                        else
+                        {
+                            token.Append((char)nextByte);
+                        }
+                    }
+                    else
+                    {
+                        if (WhitespaceChars.Contains((char)nextByte))
+                        {
+                            string newToken = token.ToString();
+#if NET35
+                            token = new StringBuilder();
+#else
+                            token.Clear();
+#endif
+                            yield return newToken;
+                        }
+                        else
+                        {
+                            token.Append((char)nextByte);
+                        }
+                    }
+
+                }
+
+            }
+        }
+
         /**
          * EPS files can contain hexadecimal-encoded ASCII blocks, each prefixed with <c>"% "</c>.
          * This method reads such a block and returns a byte[] of the decoded contents.
