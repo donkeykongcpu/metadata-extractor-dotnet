@@ -996,36 +996,7 @@ namespace MetadataExtractor.Formats.Pdf
 
                 char test = (char)provider.PeekByte(0);
 
-                if (provider.PeekByte(0) == (byte)'\\')
-                {
-                    byte peekByte = provider.PeekByte(1);
-                    if (peekByte == (byte)'\r' && provider.PeekByte(2) == (byte)'\n')
-                    {
-                        // \CRLF => ignored
-                        provider.Consume(3);
-                    }
-                    else
-                    {
-                        switch (peekByte)
-                        {
-                            case (byte)'n': token.Append('\n'); provider.Consume(2); break;
-                            case (byte)'r': token.Append('\r'); provider.Consume(2); break;
-                            case (byte)'t': token.Append('\t'); provider.Consume(2); break;
-                            case (byte)'b': token.Append('\b'); provider.Consume(2); break;
-                            case (byte)'f': token.Append('\f'); provider.Consume(2); break;
-                            case (byte)'(': token.Append('('); provider.Consume(2); break;
-                            case (byte)')': token.Append(')'); provider.Consume(2); break;
-                            case (byte)'\\': token.Append('\\'); provider.Consume(2); break;
-                            case (byte)'\n': provider.Consume(2); break; // \\n => ignored
-                            case (byte)'\r': provider.Consume(2); break; // \\r => ignored
-
-                            default: provider.Consume(1); break; // ignore the reverse solidus (\)
-                                                                 // TODO octal character codes
-                        }
-                    }
-
-                }
-                else if (provider.MatchDelimiter("("))
+                if (provider.MatchDelimiter("("))
                 {
                     provider.Consume(1);
                     if (context.Peek().Type != "literal-string")
@@ -1069,11 +1040,45 @@ namespace MetadataExtractor.Formats.Pdf
                     {
                         // keep all characters within string
 
-                        // CRLF => LF
                         if (nextByte == (byte)'\r' && provider.PeekByte(0) == (byte)'\n')
                         {
-                            token.Append('\n');
+                            token.Append('\n'); // CRLF => LF
                             provider.Consume(1);
+                        }
+                        else if (nextByte == (byte)'\r')
+                        {
+                            token.Append('\n'); // CR => LF
+                            provider.Consume(0); // already consumed
+                        }
+                        else if (nextByte == (byte)'\\')
+                        {
+                            // escape sequences
+                            byte peekByte = provider.PeekByte(0);
+                            if (peekByte == (byte)'\r' && provider.PeekByte(1) == (byte)'\n')
+                            {
+                                // \CRLF => ignored
+                                provider.Consume(2);
+                            }
+                            else
+                            {
+                                switch (peekByte)
+                                {
+                                    case (byte)'n': token.Append('\n'); provider.Consume(1); break;
+                                    case (byte)'r': token.Append('\r'); provider.Consume(1); break;
+                                    case (byte)'t': token.Append('\t'); provider.Consume(1); break;
+                                    case (byte)'b': token.Append('\b'); provider.Consume(1); break;
+                                    case (byte)'f': token.Append('\f'); provider.Consume(1); break;
+                                    case (byte)'(': token.Append('('); provider.Consume(1); break;
+                                    case (byte)')': token.Append(')'); provider.Consume(1); break;
+                                    case (byte)'\\': token.Append('\\'); provider.Consume(1); break;
+                                    case (byte)'\n': provider.Consume(1); break; // \LF => ignored
+                                    case (byte)'\r': provider.Consume(1); break; // \CR => ignored
+
+                                    default: break; // ignore the reverse solidus (\)
+                                                    // TODO octal character codes
+                                }
+                            }
+
                         }
                         else
                         {
