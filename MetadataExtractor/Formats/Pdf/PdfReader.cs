@@ -1084,18 +1084,20 @@ namespace MetadataExtractor.Formats.Pdf
                             }
                             else if (provider.TryGetOctalDigit(0, out int digit1))
                             {
+                                provider.Consume(1);
+
                                 // octal character codes
                                 // can consist of one, two or three digits
                                 // high-order overflow shall be ignored
                                 List<int> digits = new List<int> { digit1 };
 
-                                if (provider.TryGetOctalDigit(1, out int digit2))
+                                if (provider.TryGetOctalDigit(0, out int digit2))
                                 {
                                     digits.Add(digit2);
                                     provider.Consume(1);
                                 }
 
-                                if (provider.TryGetOctalDigit(1, out int digit3))
+                                if (provider.TryGetOctalDigit(0, out int digit3))
                                 {
                                     digits.Add(digit3);
                                     provider.Consume(1);
