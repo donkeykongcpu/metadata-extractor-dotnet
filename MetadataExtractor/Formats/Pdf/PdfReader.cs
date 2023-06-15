@@ -364,23 +364,40 @@ namespace MetadataExtractor.Formats.Pdf
             }
         }
 
-        public bool TryGetOctalDigit(int delta, out int result)
+        public bool TryPeekOctalDigit(int delta, out byte result)
         {
-            try
+            byte test = PeekByte(delta);
+            if (test >= (byte)'0' && test <= (byte)'7')
             {
-                byte test = PeekByte(delta);
-                if (test >= (byte)'0' && test <= (byte)'7')
-                {
-                    result = test - (byte)'0';
-                    return true;
-                }
-                else
-                {
-                    result = 0;
-                    return false;
-                }
+                result = (byte)(test - (byte)'0');
+                return true;
             }
-            catch (Exception)
+            else
+            {
+                result = 0;
+                return false;
+            }
+        }
+
+        public bool TryPeekHexadecimalDigit(int delta, out byte result)
+        {
+            byte test = PeekByte(delta);
+            if (test >= (byte)'0' && test <= (byte)'9')
+            {
+                result = (byte)(test - (byte)'0');
+                return true;
+            }
+            else if (test >= (byte)'A' && test <= (byte)'F')
+            {
+                result = (byte)(test - (byte)'A' + 10);
+                return true;
+            }
+            else if (test >= (byte)'a' && test <= (byte)'f')
+            {
+                result = (byte)(test - (byte)'a' + 10);
+                return true;
+            }
+            else
             {
                 result = 0;
                 return false;
@@ -430,7 +447,7 @@ namespace MetadataExtractor.Formats.Pdf
 
     internal abstract class TokeniseContext
     {
-        private StringBuilder _token;
+        private List<byte> _token;
 
         private readonly ByteProvider _provider;
 
@@ -447,31 +464,32 @@ namespace MetadataExtractor.Formats.Pdf
         {
             Type = type;
             Counter = 0;
-            _token = new StringBuilder();
+            _token = new List<byte>();
             _provider = provider;
         }
 
-        public abstract IEnumerable<string> Consume();
+        public abstract IEnumerable<byte[]> Consume();
 
         protected void Append(byte b)
         {
-            _token.Append((char)b); // TODO: NOT A CHAR!
+            _token.Add(b);
         }
 
         protected void Append(char c)
         {
-            _token.Append(c);
+            byte test = (byte)c;
+            if (c != test)
+            {
+                throw new Exception("Invalid byte");
+            }
+            _token.Add(test);
         }
 
-        protected string GetToken()
+        protected byte[] GetToken()
         {
-            string newToken = _token.ToString();
-#if NET35
-            _token = new StringBuilder();
-#else
+            byte[] result = _token.ToArray();
             _token.Clear();
-#endif
-            return newToken;
+            return result;
         }
 
         protected void IncrementCounter()
@@ -497,7 +515,7 @@ namespace MetadataExtractor.Formats.Pdf
 
         }
 
-        public override IEnumerable<string> Consume()
+        public override IEnumerable<byte[]> Consume()
         {
             throw new Exception("Cannot consume tokens at the root level");
         }
@@ -511,12 +529,12 @@ namespace MetadataExtractor.Formats.Pdf
 
         }
 
-        public override IEnumerable<string> Consume()
+        public override IEnumerable<byte[]> Consume()
         {
             // keep all characters within string
 
             IncrementCounter();
-            yield return "(";
+            yield return new byte[] { (byte)'(' };
 
             while (true)
             {
@@ -537,9 +555,8 @@ namespace MetadataExtractor.Formats.Pdf
                     DecrementCounter();
                     if (Counter == 0)
                     {
-                        string token = GetToken();
-                        yield return token;
-                        yield return ")";
+                        yield return GetToken();
+                        yield return new byte[] { (byte)')' };
                         yield break; // done with this literal string
                     }
                     else
@@ -566,22 +583,22 @@ namespace MetadataExtractor.Formats.Pdf
                         // \CRLF => ignored
                         Provider.Consume(2);
                     }
-                    else if (Provider.TryGetOctalDigit(0, out int digit1))
+                    else if (Provider.TryPeekOctalDigit(0, out byte digit1))
                     {
                         Provider.Consume(1);
 
                         // octal character codes
                         // can consist of one, two or three digits
                         // high-order overflow shall be ignored
-                        List<int> digits = new List<int> { digit1 };
+                        List<byte> digits = new List<byte> { digit1 };
 
-                        if (Provider.TryGetOctalDigit(0, out int digit2))
+                        if (Provider.TryPeekOctalDigit(0, out byte digit2))
                         {
                             digits.Add(digit2);
                             Provider.Consume(1);
                         }
 
-                        if (Provider.TryGetOctalDigit(0, out int digit3))
+                        if (Provider.TryPeekOctalDigit(0, out byte digit3))
                         {
                             digits.Add(digit3);
                             Provider.Consume(1);
@@ -616,6 +633,52 @@ namespace MetadataExtractor.Formats.Pdf
                 else
                 {
                     Append(nextByte);
+                }
+            }
+        }
+    }
+
+    internal class HexadecimalStringTokeniseContext : TokeniseContext
+    {
+        public HexadecimalStringTokeniseContext(ByteProvider provider)
+            : base("hex-string", provider)
+        {
+
+        }
+
+        public override IEnumerable<byte[]> Consume()
+        {
+            yield return new byte[] { (byte)'<' };
+
+            while (true)
+            {
+                if (!Provider.HasNextByte())
+                {
+                    throw new Exception("Unexpected end of input");
+                }
+
+                byte nextByte = Provider.GetNextByte();
+
+                if (nextByte == (byte)'>')
+                {
+                    byte[] token = GetToken();
+                    if (token.Length % 2 != 0)
+                    {
+                        token = token.Concat(new byte[] { 0 }).ToArray(); // odd number of digits => append 0
+                    }
+
+                    yield return token;
+                    yield return new byte[] { (byte)'>' };
+                    yield break; // done with this hexadecimal string
+                }
+                else if (Provider.TryPeekHexadecimalDigit(nextByte, out byte result))
+                {
+                    Provider.Consume(1);
+                    Append(result);
+                }
+                else
+                {
+                    throw new Exception("Unexpected byte in hexadecimal string");
                 }
             }
         }
