@@ -428,7 +428,6 @@ namespace MetadataExtractor.Formats.Pdf
 
     }
 
-
     internal abstract class TokeniseContext
     {
         private StringBuilder _token;
@@ -442,29 +441,29 @@ namespace MetadataExtractor.Formats.Pdf
 
         public string Type { get; private set; }
 
-        public int BalancingCounter { get; private set; }
+        protected int Counter { get; private set; }
 
         protected TokeniseContext(string type, ByteProvider provider)
         {
             Type = type;
-            BalancingCounter = 0;
+            Counter = 0;
             _token = new StringBuilder();
             _provider = provider;
         }
 
         public abstract IEnumerable<string> Consume();
 
-        public void Append(byte b)
+        protected void Append(byte b)
         {
             _token.Append((char)b); // TODO: NOT A CHAR!
         }
 
-        public void Append(char c)
+        protected void Append(char c)
         {
             _token.Append(c);
         }
 
-        public string GetToken()
+        protected string GetToken()
         {
             string newToken = _token.ToString();
 #if NET35
@@ -475,15 +474,15 @@ namespace MetadataExtractor.Formats.Pdf
             return newToken;
         }
 
-        public void IncrementCounter()
+        protected void IncrementCounter()
         {
-            BalancingCounter++;
+            Counter++;
         }
 
-        public void DecrementCounter()
+        protected void DecrementCounter()
         {
-            BalancingCounter--;
-            if (BalancingCounter < 0)
+            Counter--;
+            if (Counter < 0)
             {
                 throw new Exception("Counter cannot be negative");
             }
@@ -536,7 +535,7 @@ namespace MetadataExtractor.Formats.Pdf
                 else if (nextByte == (byte)')')
                 {
                     DecrementCounter();
-                    if (BalancingCounter == 0)
+                    if (Counter == 0)
                     {
                         string token = GetToken();
                         yield return token;
