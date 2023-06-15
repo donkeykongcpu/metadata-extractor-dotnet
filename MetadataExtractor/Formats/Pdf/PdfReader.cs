@@ -692,6 +692,52 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
+    internal class NameTokeniseContext : TokeniseContext
+    {
+        public NameTokeniseContext(ByteProvider provider)
+            : base("name", provider)
+        {
+
+        }
+
+        public override IEnumerable<byte[]> Consume()
+        {
+            while (true)
+            {
+                if (!Provider.HasNextByte() || PdfReader.WhitespaceChars.Contains(Provider.PeekByte(0)))
+                {
+                    Provider.Consume(1);
+                    byte[] token = GetToken();
+                    yield return new byte[] { (byte)'/' }.Concat(token).ToArray(); // prepend /
+                    yield break; // done with this name
+                }
+                else if (Provider.PeekByte(0) == (byte)'#')
+                {
+                    // the following two bytes must be hex digits
+
+                    byte digit1;
+                    byte digit2;
+                    if (!Provider.TryPeekHexadecimalDigit(1, out digit1))
+                    {
+                        throw new Exception("Unexpected byte");
+                    }
+                    if (!Provider.TryPeekHexadecimalDigit(2, out digit2))
+                    {
+                        throw new Exception("Unexpected byte");
+                    }
+                    Provider.Consume(3);
+                    byte value = (byte)(digit1 * 16 + digit2);
+                    Append(value);
+                }
+                else
+                {
+                    byte nextByte = Provider.GetNextByte();
+                    Append(nextByte);
+                }
+            }
+        }
+    }
+
     /// <summary>Reads file passed in through SequentialReader and parses encountered data:</summary>
     /// <remarks>
     /// <list type="bullet">
