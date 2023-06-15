@@ -657,24 +657,32 @@ namespace MetadataExtractor.Formats.Pdf
                     throw new Exception("Unexpected end of input");
                 }
 
-                byte nextByte = Provider.GetNextByte();
-
-                if (nextByte == (byte)'>')
+                if (Provider.PeekByte(0) == (byte)'>')
                 {
+                    Provider.Consume(1);
                     byte[] token = GetToken();
                     if (token.Length % 2 != 0)
                     {
                         token = token.Concat(new byte[] { 0 }).ToArray(); // odd number of digits => append 0
                     }
-
-                    yield return token;
+                    List<byte> result = new List<byte>();
+                    for (int i = 0; i < token.Count(); i += 2)
+                    {
+                        byte value = (byte)(token[i] * 16 + token[i + 1]);
+                        result.Add(value);
+                    }
+                    yield return result.ToArray();
                     yield return new byte[] { (byte)'>' };
                     yield break; // done with this hexadecimal string
                 }
-                else if (Provider.TryPeekHexadecimalDigit(nextByte, out byte result))
+                else if (Provider.TryPeekHexadecimalDigit(0, out byte result))
                 {
                     Provider.Consume(1);
                     Append(result);
+                }
+                else if (PdfReader.WhitespaceChars.Contains(Provider.PeekByte(0)))
+                {
+                    Provider.Consume(1); // ignore whitespace within
                 }
                 else
                 {
@@ -712,7 +720,7 @@ namespace MetadataExtractor.Formats.Pdf
     {
         private static byte[] PreambleBytes { get; } = Encoding.ASCII.GetBytes("%PDF-");
 
-        private static char[] _whitespaceChars = new byte[] { 0x00, 0x09, 0x0A, 0x0C, 0x0D, 0x20 }.Select(b => (char)b).ToArray();
+        public static byte[] WhitespaceChars = new byte[] { 0x00, 0x09, 0x0A, 0x0C, 0x0D, 0x20 };
 
         private static char[] _tokenSeparatorChars = new byte[] { 0x00, 0x09, 0x0C, 0x20 }.Select(b => (char)b).ToArray();
 
