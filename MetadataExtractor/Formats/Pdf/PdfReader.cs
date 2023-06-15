@@ -416,7 +416,7 @@ namespace MetadataExtractor.Formats.Pdf
         public StringByteProvider(string input)
             : base(index: 0)
         {
-            _input = Encoding.UTF8.GetBytes(input);
+            _input = input.ToCharArray().Select(x => (byte)x).ToArray();
         }
 
         protected override byte DoGetByte(int index)
@@ -445,6 +445,83 @@ namespace MetadataExtractor.Formats.Pdf
 
     }
 
+    public abstract class Token : IEquatable<Token>
+    {
+        public abstract string Type { get; }
+
+        public byte[] Value { get; }
+
+        protected Token(byte[] value)
+        {
+            Value = value;
+        }
+
+        public bool Equals(Token other)
+        {
+            if (other is null) return false;
+            if (other.Type != Type) return false;
+            return Value.EqualTo(other.Value);
+        }
+    }
+
+    internal class ArrayBeginToken : Token
+    {
+        public override string Type => "array-begin";
+        public ArrayBeginToken() : base(new byte[] { (byte)'[' }) { }
+    }
+
+    internal class ArrayEndToken : Token
+    {
+        public override string Type => "array-end";
+        public ArrayEndToken() : base(new byte[] { (byte)']' }) { }
+    }
+
+    internal class DictionaryBeginToken : Token
+    {
+        public override string Type => "dictionary-begin";
+        public DictionaryBeginToken() : base(new byte[] { (byte)'<', (byte)'<' }) { }
+    }
+
+    internal class DictionaryEndToken : Token
+    {
+        public override string Type => "dictionary-end";
+        public DictionaryEndToken() : base(new byte[] { (byte)'>', (byte)'>' }) { }
+    }
+
+    public class StringToken : Token
+    {
+        public override string Type => "string";
+
+        public StringToken(byte[] value)
+            : base(value)
+        {
+
+        }
+
+        public string ToASCIIString()
+        {
+            return Encoding.ASCII.GetString(Value);
+        }
+    }
+
+    public class NameToken : Token
+    {
+        public override string Type => "name";
+
+        public NameToken(byte[] value)
+            : base(value)
+        {
+            // the value does not include the leading slash (/)
+        }
+
+        public string ToUTF8String()
+        {
+            // names are not usually intended to be printed,
+            // but when they are, their encoding is supposed to be UTF8
+            return Encoding.UTF8.GetString(Value);
+        }
+    }
+
     internal abstract class TokeniseContext
     {
         private List<byte> _token;
@@ -468,7 +545,7 @@ namespace MetadataExtractor.Formats.Pdf
             _provider = provider;
         }
 
-        public abstract IEnumerable<byte[]> Consume();
+        public abstract IEnumerable<Token> Consume();
 
         protected void Append(byte b)
         {
@@ -515,7 +592,7 @@ namespace MetadataExtractor.Formats.Pdf
 
         }
 
-        public override IEnumerable<byte[]> Consume()
+        public override IEnumerable<Token> Consume()
         {
             throw new Exception("Cannot consume tokens at the root level");
         }
@@ -529,12 +606,11 @@ namespace MetadataExtractor.Formats.Pdf
 
         }
 
-        public override IEnumerable<byte[]> Consume()
+        public override IEnumerable<Token> Consume()
         {
             // keep all characters within string
 
             IncrementCounter();
-            yield return new byte[] { (byte)'(' };
 
             while (true)
             {
@@ -555,8 +631,7 @@ namespace MetadataExtractor.Formats.Pdf
                     DecrementCounter();
                     if (Counter == 0)
                     {
-                        yield return GetToken();
-                        yield return new byte[] { (byte)')' };
+                        yield return new StringToken(GetToken());
                         yield break; // done with this literal string
                     }
                     else
@@ -646,10 +721,8 @@ namespace MetadataExtractor.Formats.Pdf
 
         }
 
-        public override IEnumerable<byte[]> Consume()
+        public override IEnumerable<Token> Consume()
         {
-            yield return new byte[] { (byte)'<' };
-
             while (true)
             {
                 if (!Provider.HasNextByte())
@@ -671,8 +744,7 @@ namespace MetadataExtractor.Formats.Pdf
                         byte value = (byte)(token[i] * 16 + token[i + 1]);
                         result.Add(value);
                     }
-                    yield return result.ToArray();
-                    yield return new byte[] { (byte)'>' };
+                    yield return new StringToken(result.ToArray());
                     yield break; // done with this hexadecimal string
                 }
                 else if (Provider.TryPeekHexadecimalDigit(0, out byte result))
@@ -700,15 +772,14 @@ namespace MetadataExtractor.Formats.Pdf
 
         }
 
-        public override IEnumerable<byte[]> Consume()
+        public override IEnumerable<Token> Consume()
         {
             while (true)
             {
                 if (!Provider.HasNextByte() || PdfReader.WhitespaceChars.Contains(Provider.PeekByte(0)))
                 {
                     Provider.Consume(1);
-                    byte[] token = GetToken();
-                    yield return new byte[] { (byte)'/' }.Concat(token).ToArray(); // prepend /
+                    yield return new NameToken(GetToken()); // does not include the leading slash (/)
                     yield break; // done with this name
                 }
                 else if (Provider.PeekByte(0) == (byte)'#')
@@ -1300,7 +1371,7 @@ namespace MetadataExtractor.Formats.Pdf
             return result.Where(line => line.Count > 0).ToList(); // excluding lines with no tokens
         }
 
-        public static IEnumerable<string> Tokenise(ByteProvider provider)
+        public static IEnumerable<Token> Tokenise(ByteProvider provider)
         {
             Stack<TokeniseContext> context = new Stack<TokeniseContext>();
 
