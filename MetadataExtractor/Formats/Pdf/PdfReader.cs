@@ -428,16 +428,197 @@ namespace MetadataExtractor.Formats.Pdf
 
     }
 
-    internal sealed class TokeniseContext
+
+    internal abstract class TokeniseContext
     {
-        public string Type { get; }
+        private StringBuilder _token;
 
-        public int BalancingCounter { get; set; }
+        private readonly ByteProvider _provider;
 
-        public TokeniseContext(string type)
+        protected ByteProvider Provider
+        {
+            get => _provider;
+        }
+
+        public string Type { get; private set; }
+
+        public int BalancingCounter { get; private set; }
+
+        protected TokeniseContext(string type, ByteProvider provider)
         {
             Type = type;
             BalancingCounter = 0;
+            _token = new StringBuilder();
+            _provider = provider;
+        }
+
+        public abstract IEnumerable<string> Consume();
+
+        public void Append(byte b)
+        {
+            _token.Append((char)b); // TODO: NOT A CHAR!
+        }
+
+        public void Append(char c)
+        {
+            _token.Append(c);
+        }
+
+        public string GetToken()
+        {
+            string newToken = _token.ToString();
+#if NET35
+            _token = new StringBuilder();
+#else
+            _token.Clear();
+#endif
+            return newToken;
+        }
+
+        public void IncrementCounter()
+        {
+            BalancingCounter++;
+        }
+
+        public void DecrementCounter()
+        {
+            BalancingCounter--;
+            if (BalancingCounter < 0)
+            {
+                throw new Exception("Counter cannot be negative");
+            }
+        }
+    }
+
+    internal class RootTokeniseContext : TokeniseContext
+    {
+        public RootTokeniseContext(ByteProvider provider)
+          : base("root", provider)
+        {
+
+        }
+
+        public override IEnumerable<string> Consume()
+        {
+            throw new Exception("Cannot consume tokens at the root level");
+        }
+    }
+
+    internal class LiteralStringTokeniseContext : TokeniseContext
+    {
+        public LiteralStringTokeniseContext(ByteProvider provider)
+            : base("literal-string", provider)
+        {
+
+        }
+
+        public override IEnumerable<string> Consume()
+        {
+            // keep all characters within string
+
+            IncrementCounter();
+            yield return "(";
+
+            while (true)
+            {
+                if (!Provider.HasNextByte())
+                {
+                    throw new Exception("Unexpected end of input");
+                }
+
+                byte nextByte = Provider.GetNextByte();
+
+                if (nextByte == (byte)'(')
+                {
+                    IncrementCounter();
+                    Append('(');
+                }
+                else if (nextByte == (byte)')')
+                {
+                    DecrementCounter();
+                    if (BalancingCounter == 0)
+                    {
+                        string token = GetToken();
+                        yield return token;
+                        yield return ")";
+                        yield break; // done with this literal string
+                    }
+                    else
+                    {
+                        Append(')');
+                    }
+                }
+                else if (nextByte == (byte)'\r' && Provider.PeekByte(0) == (byte)'\n')
+                {
+                    Append('\n'); // CRLF => LF
+                    Provider.Consume(1);
+                }
+                else if (nextByte == (byte)'\r')
+                {
+                    Append('\n'); // CR => LF
+                    Provider.Consume(0); // already consumed
+                }
+                else if (nextByte == (byte)'\\')
+                {
+                    // escape sequences
+                    byte peekByte = Provider.PeekByte(0);
+                    if (peekByte == (byte)'\r' && Provider.PeekByte(1) == (byte)'\n')
+                    {
+                        // \CRLF => ignored
+                        Provider.Consume(2);
+                    }
+                    else if (Provider.TryGetOctalDigit(0, out int digit1))
+                    {
+                        Provider.Consume(1);
+
+                        // octal character codes
+                        // can consist of one, two or three digits
+                        // high-order overflow shall be ignored
+                        List<int> digits = new List<int> { digit1 };
+
+                        if (Provider.TryGetOctalDigit(0, out int digit2))
+                        {
+                            digits.Add(digit2);
+                            Provider.Consume(1);
+                        }
+
+                        if (Provider.TryGetOctalDigit(0, out int digit3))
+                        {
+                            digits.Add(digit3);
+                            Provider.Consume(1);
+                        }
+
+                        int value = 0;
+                        for (int i = 0; i < digits.Count; i++)
+                        {
+                            value += digits[digits.Count - 1 - i] * (int)Math.Pow(8, i);
+                        }
+                        byte coerced = (byte)value;
+                        Append(coerced);
+                    }
+                    else
+                    {
+                        switch (peekByte)
+                        {
+                            case (byte)'n': Append('\n'); Provider.Consume(1); break;
+                            case (byte)'r': Append('\r'); Provider.Consume(1); break;
+                            case (byte)'t': Append('\t'); Provider.Consume(1); break;
+                            case (byte)'b': Append('\b'); Provider.Consume(1); break;
+                            case (byte)'f': Append('\f'); Provider.Consume(1); break;
+                            case (byte)'(': Append('('); Provider.Consume(1); break;
+                            case (byte)')': Append(')'); Provider.Consume(1); break;
+                            case (byte)'\\': Append('\\'); Provider.Consume(1); break;
+                            case (byte)'\n': Provider.Consume(1); break; // \LF => ignored
+                            case (byte)'\r': Provider.Consume(1); break; // \CR => ignored
+                            default: break; // ignore \ and process next byte
+                        }
+                    }
+                }
+                else
+                {
+                    Append(nextByte);
+                }
+            }
         }
     }
 
@@ -1003,13 +1184,11 @@ namespace MetadataExtractor.Formats.Pdf
             return result.Where(line => line.Count > 0).ToList(); // excluding lines with no tokens
         }
 
-        private IEnumerable<string> Tokenise(ByteProvider provider)
+        public static IEnumerable<string> Tokenise(ByteProvider provider)
         {
             Stack<TokeniseContext> context = new Stack<TokeniseContext>();
 
-            context.Push(new TokeniseContext("root")); // make sure stack is never empty
-
-            StringBuilder token = new StringBuilder();
+            context.Push(new RootTokeniseContext(provider)); // make sure stack is never empty
 
             int counter = 0;
 
@@ -1022,138 +1201,13 @@ namespace MetadataExtractor.Formats.Pdf
                 if (provider.MatchDelimiter("("))
                 {
                     provider.Consume(1);
-                    if (context.Peek().Type != "literal-string")
+                    var literalStringContext = new LiteralStringTokeniseContext(provider);
+                    foreach (string token in literalStringContext.Consume())
                     {
-                        context.Push(new TokeniseContext("literal-string"));
-                        context.Peek().BalancingCounter++;
-                        yield return "(";
-                    }
-                    else
-                    {
-                        context.Peek().BalancingCounter++;
-                        token.Append("(");
+                        yield return token;
                     }
                 }
-                else if (provider.MatchDelimiter(")"))
-                {
-                    provider.Consume(1);
-                    context.Peek().BalancingCounter--;
-                    if (context.Peek().BalancingCounter == 0)
-                    {
-                        context.Pop();
-                        string newToken = token.ToString();
-#if NET35
-                        token = new StringBuilder();
-#else
-                        token.Clear();
-#endif
-                        yield return newToken;
-                        yield return ")";
-                    }
-                    else
-                    {
-                        token.Append(")");
-                    }
-                }
-                else
-                {
-                    byte nextByte = provider.GetNextByte();
 
-                    if (context.Peek().Type == "literal-string")
-                    {
-                        // keep all characters within string
-
-                        if (nextByte == (byte)'\r' && provider.PeekByte(0) == (byte)'\n')
-                        {
-                            token.Append('\n'); // CRLF => LF
-                            provider.Consume(1);
-                        }
-                        else if (nextByte == (byte)'\r')
-                        {
-                            token.Append('\n'); // CR => LF
-                            provider.Consume(0); // already consumed
-                        }
-                        else if (nextByte == (byte)'\\')
-                        {
-                            // escape sequences
-                            byte peekByte = provider.PeekByte(0);
-                            if (peekByte == (byte)'\r' && provider.PeekByte(1) == (byte)'\n')
-                            {
-                                // \CRLF => ignored
-                                provider.Consume(2);
-                            }
-                            else if (provider.TryGetOctalDigit(0, out int digit1))
-                            {
-                                provider.Consume(1);
-
-                                // octal character codes
-                                // can consist of one, two or three digits
-                                // high-order overflow shall be ignored
-                                List<int> digits = new List<int> { digit1 };
-
-                                if (provider.TryGetOctalDigit(0, out int digit2))
-                                {
-                                    digits.Add(digit2);
-                                    provider.Consume(1);
-                                }
-
-                                if (provider.TryGetOctalDigit(0, out int digit3))
-                                {
-                                    digits.Add(digit3);
-                                    provider.Consume(1);
-                                }
-
-                                int value = 0;
-                                int power = 0;
-                                for (int i = digits.Count() - 1; i >= 0; i--)
-                                {
-                                    value += digits[i] * (int)Math.Pow(8, power++);
-                                }
-                                byte coerced = (byte)value;
-                                token.Append((char)coerced); // TODO: NOT A CHAR!
-                            }
-                            else
-                            {
-                                switch (peekByte)
-                                {
-                                    case (byte)'n': token.Append('\n'); provider.Consume(1); break;
-                                    case (byte)'r': token.Append('\r'); provider.Consume(1); break;
-                                    case (byte)'t': token.Append('\t'); provider.Consume(1); break;
-                                    case (byte)'b': token.Append('\b'); provider.Consume(1); break;
-                                    case (byte)'f': token.Append('\f'); provider.Consume(1); break;
-                                    case (byte)'(': token.Append('('); provider.Consume(1); break;
-                                    case (byte)')': token.Append(')'); provider.Consume(1); break;
-                                    case (byte)'\\': token.Append('\\'); provider.Consume(1); break;
-                                    case (byte)'\n': provider.Consume(1); break; // \LF => ignored
-                                    case (byte)'\r': provider.Consume(1); break; // \CR => ignored
-                                    default: break; // ignore \ and process next byte
-                                }
-                            }
-                        }
-                        else
-                        {
-                            token.Append((char)nextByte);
-                        }
-                    }
-                    else
-                    {
-                        if (WhitespaceChars.Contains((char)nextByte))
-                        {
-                            string newToken = token.ToString();
-#if NET35
-                            token = new StringBuilder();
-#else
-                            token.Clear();
-#endif
-                            yield return newToken;
-                        }
-                        else
-                        {
-                            token.Append((char)nextByte);
-                        }
-                    }
-
-                }
 
             }
         }
