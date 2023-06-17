@@ -526,6 +526,12 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
+    internal class DummyToken : Token
+    {
+        public override string Type => "dummy";
+        public DummyToken() : base("dummy") { }
+    }
+
     internal class IndirectReferenceToken : Token
     {
         public override string Type => "R";
@@ -981,6 +987,58 @@ namespace MetadataExtractor.Formats.Pdf
                 }
             }
         }
+    }
+
+    internal class TokenProvider
+    {
+        private readonly IEnumerator<Token> _tokens;
+
+        private readonly List<Token> _buffer;
+
+        public TokenProvider(IEnumerable<Token> tokens)
+        {
+            _tokens = tokens.GetEnumerator();
+
+            _buffer = new List<Token>(5); // we don't usually need to peek ahead that much
+        }
+
+        public Token GetNextToken()
+        {
+            if (_buffer.Count == 0)
+            {
+                BufferNextToken();
+            }
+            var result = _buffer.First();
+            _buffer.RemoveAt(0);
+            return result;
+        }
+
+        public Token PeekNextToken(int delta)
+        {
+            if (delta < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(delta), "Delta value cannot be negative");
+            }
+            while (delta + 1 > _buffer.Count)
+            {
+                BufferNextToken();
+            }
+            return _buffer[delta];
+        }
+
+        private void BufferNextToken()
+        {
+            bool hasNext = _tokens.MoveNext();
+            if (hasNext)
+            {
+                _buffer.Add(_tokens.Current);
+            }
+            else
+            {
+                _buffer.Add(new DummyToken());
+            }
+        }
+
     }
 
     /// <summary>Reads file passed in through SequentialReader and parses encountered data:</summary>
