@@ -1303,92 +1303,52 @@ namespace MetadataExtractor.Formats.Pdf
             else return tokens[index];
         }
 
-        private static object? ParseObject(IndexedReader reader, XrefEntry[] xrefTable, string[] tokens)
+        private static object? ParseObject(IndexedReader reader, XrefEntry[] xrefTable, IEnumerable<Token> tokens)
         {
+            //if (depth > 30)
+            //{
+            //    return "TOO-DEEP";
+            //}
+
             var parseContext = new ParseContext();
 
-            for (int index = 0; index < tokens.Length; index++)
+            TokenProvider tokenProvider = new TokenProvider(tokens);
+
+            while (tokenProvider.HasNextToken())
             {
-                var nextToken = tokens[index];
+                var nextToken = tokenProvider.GetNextToken();
+
+                //if (nextToken == "stream")
+                //{
+                //    // TODO implement stream objects
+
+                //    break;
+                //}
 
                 // first check if we have either an indirect object (objectNumber generation "obj" ... "endobj)
                 // or an indirect reference to an object (objectNumber generation "R")
 
-                if (uint.TryParse(GetTokenAtIndex(tokens, index), out var objectNumber) && ushort.TryParse(GetTokenAtIndex(tokens, index + 1), out var generation))
+                if (nextToken is NumericIntegerToken && tokenProvider.PeekNextToken(1) is NumericIntegerToken && tokenProvider.PeekNextToken(2) is IndirectReferenceMarkerToken)
                 {
-                    if (GetTokenAtIndex(tokens, index + 2) == "R")
-                    {
-                        parseContext.StartContext("objectref");
-                        parseContext.Add(objectNumber + " " + generation);
-                        parseContext.EndContext("objectref");
-                        index += 2;
-                        continue;
-                    }
-                    else if (GetTokenAtIndex(tokens, index + 2) == "obj")
-                    {
-                        throw new NotImplementedException();
-                    }
+                    var objectNumber = (nextToken as NumericIntegerToken)!.IntegerValue;
+                    var generation = (tokenProvider.GetNextToken() as NumericIntegerToken)!.IntegerValue;
+                    parseContext.Add(new IndirectReferenceToken(objectNumber, generation));
                 }
-
-                if (nextToken == "null")
-                {
-                    parseContext.Add(null);
-                    continue;
-                }
-                else if (nextToken == "true")
-                {
-                    parseContext.Add(true);
-                    continue;
-                }
-                else if (nextToken == "false")
-                {
-                    parseContext.Add(false);
-                    continue;
-                }
-                else if (nextToken.StartsWith("/"))
-                {
-                    parseContext.Add(nextToken); // TODO this needs to be parsed as a name
-                    continue;
-                }
-                else if (int.TryParse(nextToken, out var intValue))
-                {
-                    parseContext.Add(intValue);
-                    continue;
-                }
-                else if (decimal.TryParse(nextToken, out var decimalValue))
-                {
-                    parseContext.Add(decimalValue);
-                    continue;
-                }
-                else if (nextToken.StartsWith("("))
-                {
-                    parseContext.StartContext("string"); // strings can be nested, but we flatten them
-                    continue;
-                }
-                else if (nextToken.EndsWith(")"))
-                {
-                    parseContext.EndContext("string");
-                    continue;
-                }
-                else if (nextToken.StartsWith("["))
+                else if (nextToken is ArrayBeginToken)
                 {
                     parseContext.StartContext("array");
-                    continue;
                 }
-                else if (nextToken.EndsWith("]"))
+                else if (nextToken is ArrayEndToken)
                 {
                     parseContext.EndContext("array");
-                    continue;
                 }
-                else if (nextToken.StartsWith("<<"))
+                else if (nextToken is DictionaryBeginToken)
                 {
                     parseContext.StartContext("dictionary");
-                    continue;
                 }
-                else if (nextToken.EndsWith(">>"))
+                else if (nextToken is DictionaryEndToken)
                 {
                     parseContext.EndContext("dictionary");
-                    continue;
                 }
                 else
                 {
