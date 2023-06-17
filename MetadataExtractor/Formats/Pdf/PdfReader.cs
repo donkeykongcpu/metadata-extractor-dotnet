@@ -1555,19 +1555,116 @@ namespace MetadataExtractor.Formats.Pdf
             {
                 if (counter++ > 1000) yield break;
 
-                char test = (char)provider.PeekByte(0);
-
-                if (provider.MatchDelimiter("("))
+                if (WhitespaceChars.Contains(provider.PeekByte(0)))
+                {
+                    provider.Consume(1);
+                    continue;
+                }
+                else if (provider.MatchToken("R"))
+                {
+                    provider.Consume("R".Length);
+                    yield return new IndirectReferenceMarkerToken();
+                }
+                else if (provider.MatchToken("obj"))
+                {
+                    provider.Consume("obj".Length);
+                    yield return new IndirectObjectBeginToken();
+                }
+                else if (provider.MatchToken("endobj"))
+                {
+                    provider.Consume("endobj".Length);
+                    yield return new IndirectObjectEndToken();
+                }
+                else if (provider.MatchToken("stream"))
+                {
+                    provider.Consume("stream".Length);
+                    yield return new StreamBeginToken();
+                }
+                else if (provider.MatchToken("endstream"))
+                {
+                    provider.Consume("endstream".Length);
+                    yield return new StreamEndToken();
+                }
+                else if (provider.MatchToken("null"))
+                {
+                    provider.Consume("null".Length);
+                    yield return new NullToken();
+                }
+                else if (provider.MatchToken("true"))
+                {
+                    provider.Consume("true".Length);
+                    yield return new BooleanTrueToken();
+                }
+                else if (provider.MatchToken("false"))
+                {
+                    provider.Consume("false".Length);
+                    yield return new BooleanFalseToken();
+                }
+                else if (provider.TryMatchNumericToken(out Token? numericToken))
+                {
+                    provider.Consume(numericToken.Value.Length);
+                    yield return numericToken;
+                }
+                else if (provider.MatchDelimiter("(")) // matches up to )
                 {
                     provider.Consume(1);
                     var literalStringContext = new LiteralStringTokeniseContext(provider);
-                    foreach (string token in literalStringContext.Consume())
+                    foreach (Token token in literalStringContext.Consume())
                     {
                         yield return token;
                     }
                 }
-
-
+                else if (provider.MatchDelimiter("[")) // begin array
+                {
+                    provider.Consume(1);
+                    yield return new ArrayBeginToken();
+                }
+                else if (provider.MatchDelimiter("]")) // end array
+                {
+                    provider.Consume(1);
+                    yield return new ArrayEndToken();
+                }
+                else if (provider.MatchDelimiter("<<")) // begin dictionary
+                {
+                    provider.Consume(2);
+                    yield return new DictionaryBeginToken();
+                }
+                else if (provider.MatchDelimiter(">>")) // end dictionary
+                {
+                    provider.Consume(2);
+                    yield return new DictionaryEndToken();
+                }
+                else if (provider.MatchDelimiter("<")) // matches up to >
+                {
+                    provider.Consume(1);
+                    var hexadecimalStringContext = new HexadecimalStringTokeniseContext(provider);
+                    foreach (Token token in hexadecimalStringContext.Consume())
+                    {
+                        yield return token;
+                    }
+                }
+                else if (provider.MatchDelimiter("/")) // matches up to whitespace
+                {
+                    provider.Consume(1);
+                    var nameContext = new NameTokeniseContext(provider);
+                    foreach (Token token in nameContext.Consume())
+                    {
+                        yield return token;
+                    }
+                }
+                else if (provider.MatchDelimiter("%")) // matches up to end-of-line marker
+                {
+                    provider.Consume(1);
+                    var commentContext = new CommentTokeniseContext(provider);
+                    foreach (Token token in commentContext.Consume())
+                    {
+                        yield return token;
+                    }
+                }
+                else
+                {
+                    throw new Exception("Invalid character in input");
+                }
             }
         }
 
