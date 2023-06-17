@@ -511,6 +511,13 @@ namespace MetadataExtractor.Formats.Pdf
             Value = value;
         }
 
+        protected Token(string value)
+        {
+            // value should only contain 1-byte characters
+
+            Value = value.ToCharArray().Select(x => (byte)x).ToArray();
+        }
+
         public bool Equals(Token other)
         {
             if (other is null) return false;
@@ -519,22 +526,52 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
+    internal class IndirectReferenceToken : Token
+    {
+        public override string Type => "R";
+        public IndirectReferenceToken() : base("R") { }
+    }
+
+    internal class IndirectObjectBeginToken : Token
+    {
+        public override string Type => "obj";
+        public IndirectObjectBeginToken() : base("obj") { }
+    }
+
+    internal class IndirectObjectEndToken : Token
+    {
+        public override string Type => "endobj";
+        public IndirectObjectEndToken() : base("endobj") { }
+    }
+
+    internal class StreamBeginToken : Token
+    {
+        public override string Type => "stream";
+        public StreamBeginToken() : base("stream") { }
+    }
+
+    internal class StreamEndToken : Token
+    {
+        public override string Type => "endstream";
+        public StreamEndToken() : base("endstream") { }
+    }
+
     internal class NullToken : Token
     {
         public override string Type => "null";
-        public NullToken() : base("null".ToCharArray().Select(x => (byte)x).ToArray()) { }
+        public NullToken() : base("null") { }
     }
 
     internal class BooleanTrueToken : Token
     {
         public override string Type => "true";
-        public BooleanTrueToken() : base("true".ToCharArray().Select(x => (byte)x).ToArray()) { }
+        public BooleanTrueToken() : base("true") { }
     }
 
     internal class BooleanFalseToken : Token
     {
         public override string Type => "false";
-        public BooleanFalseToken() : base("false".ToCharArray().Select(x => (byte)x).ToArray()) { }
+        public BooleanFalseToken() : base("false") { }
     }
 
     public class NumericIntegerToken : Token
@@ -566,25 +603,25 @@ namespace MetadataExtractor.Formats.Pdf
     internal class ArrayBeginToken : Token
     {
         public override string Type => "array-begin";
-        public ArrayBeginToken() : base(new byte[] { (byte)'[' }) { }
+        public ArrayBeginToken() : base("[") { }
     }
 
     internal class ArrayEndToken : Token
     {
         public override string Type => "array-end";
-        public ArrayEndToken() : base(new byte[] { (byte)']' }) { }
+        public ArrayEndToken() : base("]") { }
     }
 
     internal class DictionaryBeginToken : Token
     {
         public override string Type => "dictionary-begin";
-        public DictionaryBeginToken() : base(new byte[] { (byte)'<', (byte)'<' }) { }
+        public DictionaryBeginToken() : base("<<") { }
     }
 
     internal class DictionaryEndToken : Token
     {
         public override string Type => "dictionary-end";
-        public DictionaryEndToken() : base(new byte[] { (byte)'>', (byte)'>' }) { }
+        public DictionaryEndToken() : base(">>") { }
     }
 
     public class StringToken : Token
