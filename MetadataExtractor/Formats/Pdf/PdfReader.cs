@@ -456,6 +456,11 @@ namespace MetadataExtractor.Formats.Pdf
 
             Generation = (ushort)generation;
         }
+
+        public override string ToString()
+        {
+            return "{@" + ObjectNumber + " " + Generation + "}";
+        }
     }
 
     internal class IndirectReferenceMarkerToken : Token
@@ -492,18 +497,30 @@ namespace MetadataExtractor.Formats.Pdf
     {
         public override string Type => "null";
         public NullToken() : base("null") { }
+        public override string ToString()
+        {
+            return "null";
+        }
     }
 
     internal class BooleanTrueToken : Token
     {
         public override string Type => "true";
         public BooleanTrueToken() : base("true") { }
+        public override string ToString()
+        {
+            return "true";
+        }
     }
 
     internal class BooleanFalseToken : Token
     {
         public override string Type => "false";
         public BooleanFalseToken() : base("false") { }
+        public override string ToString()
+        {
+            return "false";
+        }
     }
 
     public class NumericIntegerToken : Token
@@ -517,6 +534,10 @@ namespace MetadataExtractor.Formats.Pdf
         {
             IntegerValue = value;
         }
+        public override string ToString()
+        {
+            return IntegerValue.ToString();
+        }
     }
 
     public class NumericRealToken : Token
@@ -529,6 +550,10 @@ namespace MetadataExtractor.Formats.Pdf
             : base(rawValue)
         {
             RealValue = value;
+        }
+        public override string ToString()
+        {
+            return RealValue.ToString();
         }
     }
 
@@ -566,9 +591,19 @@ namespace MetadataExtractor.Formats.Pdf
 
         }
 
+        public override string ToString()
+        {
+            return Encoding.ASCII.GetString(Value); // TODO: encoding is context-specific
+        }
+
         public string ToASCIIString()
         {
             return Encoding.ASCII.GetString(Value);
+        }
+
+        public string ToUTF8String()
+        {
+            return Encoding.UTF8.GetString(Value);
         }
     }
 
@@ -582,7 +617,7 @@ namespace MetadataExtractor.Formats.Pdf
             // the value does not include the leading slash (/)
         }
 
-        public string ToUTF8String()
+        public override string ToString()
         {
             // names are not usually intended to be printed,
             // but when they are, their encoding is supposed to be UTF8
