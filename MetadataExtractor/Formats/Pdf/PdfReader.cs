@@ -1364,11 +1364,14 @@ namespace MetadataExtractor.Formats.Pdf
                 // first check if we have either an indirect object (objectNumber generation "obj" ... "endobj)
                 // or an indirect reference to an object (objectNumber generation "R")
 
-                if (nextToken is NumericIntegerToken && tokenProvider.PeekNextToken(1) is NumericIntegerToken && tokenProvider.PeekNextToken(2) is IndirectReferenceMarkerToken)
+                if (nextToken is NumericIntegerToken && tokenProvider.PeekNextToken(0) is NumericIntegerToken && tokenProvider.PeekNextToken(1) is IndirectReferenceMarkerToken)
                 {
                     var objectNumber = (nextToken as NumericIntegerToken)!.IntegerValue;
-                    var generation = (tokenProvider.GetNextToken() as NumericIntegerToken)!.IntegerValue;
+                    var generation = (tokenProvider.PeekNextToken(0) as NumericIntegerToken)!.IntegerValue;
                     parseContext.Add(new IndirectReferenceToken(objectNumber, generation));
+                    // consume two tokens
+                    tokenProvider.GetNextToken();
+                    tokenProvider.GetNextToken();
                 }
                 else if (nextToken is ArrayBeginToken)
                 {
