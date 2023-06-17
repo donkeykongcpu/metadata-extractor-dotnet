@@ -83,80 +83,6 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
-    internal class PdfObjectReference : PdfObject
-    {
-        private uint _objectNumber;
-
-        private ushort _generation;
-
-        private bool _valueWasSet;
-
-        public string Type => "objectref";
-
-        public PdfObjectReference()
-        {
-            _valueWasSet = false;
-        }
-
-        public object? GetValue()
-        {
-            if (!_valueWasSet)
-            {
-                throw new Exception("Value was not set");
-            }
-
-            return $"{_objectNumber} {_generation}";
-        }
-
-        public void Add(object? value)
-        {
-            string? token = value as string;
-            if (token is null || token == string.Empty)
-            {
-                return;
-            }
-            string[] tokens = token.Split(' ');
-            _objectNumber = uint.Parse(tokens[0]);
-            _generation = ushort.Parse(tokens[1]);
-            _valueWasSet = true;
-        }
-    }
-
-    internal class PdfString : PdfObject
-    {
-        private readonly List<string> _tokens;
-
-        private readonly PdfString? _parent;
-
-        public string Type => "string";
-
-        public PdfString(PdfString? parent)
-        {
-            _tokens = new List<string>();
-            _parent = parent;
-        }
-
-        public object? GetValue()
-        {
-            return string.Join(" ", _tokens.ToArray());
-        }
-
-        public void Add(object? value)
-        {
-            string? token = value as string;
-            if (token is null || token == string.Empty)
-            {
-                return;
-            }
-            PdfString? rootString = this;
-            while (rootString._parent is not null)
-            {
-                rootString = rootString._parent;
-            }
-            rootString._tokens.Add(token); // always add it to the root string
-        }
-    }
-
     internal class PdfArray : PdfObject
     {
         private readonly List<object?> _array;
@@ -198,7 +124,7 @@ namespace MetadataExtractor.Formats.Pdf
 
         public void Add(object? value)
         {
-            if (IsName(value))
+            if (value is NameToken)
             {
                 if (_currentKey is not null)
                 {
@@ -207,7 +133,7 @@ namespace MetadataExtractor.Formats.Pdf
                 }
                 else
                 {
-                    _currentKey = value as string;
+                    _currentKey = Encoding.ASCII.GetString((value as NameToken)!.Value); // TODO: dictionary keeps are probably ASCII
                 }
             }
             else
@@ -219,12 +145,6 @@ namespace MetadataExtractor.Formats.Pdf
                 _dictionary.Add(_currentKey, value);
                 _currentKey = null;
             }
-        }
-
-        private bool IsName(object? value)
-        {
-            string? token = value as string;
-            return (token is not null && token.StartsWith("/"));
         }
     }
 
@@ -253,21 +173,10 @@ namespace MetadataExtractor.Formats.Pdf
 
         public void StartContext(string type)
         {
-            if (ContextType == "string" && type != "string")
-            {
-                throw new Exception("Strings can only contain other strings");
-            }
             PdfObject pdfObject;
-            PdfString? parentString = null;
-            if (ContextType == "string")
-            {
-                parentString = _stack.Peek() as PdfString;
-            }
             switch (type)
             {
                 case "root": pdfObject = new PdfRoot(); break;
-                case "objectref": pdfObject = new PdfObjectReference(); break;
-                case "string": pdfObject = new PdfString(parentString); break;
                 case "array": pdfObject = new PdfArray(); break;
                 case "dictionary": pdfObject = new PdfDictionary(); break;
                 default: throw new Exception("Invalid type");
@@ -534,8 +443,25 @@ namespace MetadataExtractor.Formats.Pdf
 
     internal class IndirectReferenceToken : Token
     {
+        public uint ObjectNumber { get; }
+
+        public ushort Generation { get; }
+
+        public override string Type => "indirect-reference";
+
+        public IndirectReferenceToken(int objectNumber, int generation)
+            : base(new byte[] { })
+        {
+            ObjectNumber = (uint)objectNumber;
+
+            Generation = (ushort)generation;
+        }
+    }
+
+    internal class IndirectReferenceMarkerToken : Token
+    {
         public override string Type => "R";
-        public IndirectReferenceToken() : base("R") { }
+        public IndirectReferenceMarkerToken() : base("R") { }
     }
 
     internal class IndirectObjectBeginToken : Token
@@ -582,7 +508,7 @@ namespace MetadataExtractor.Formats.Pdf
 
     public class NumericIntegerToken : Token
     {
-        public decimal IntegerValue { get; }
+        public int IntegerValue { get; }
 
         public override string Type => "numeric-integer";
 
@@ -995,11 +921,20 @@ namespace MetadataExtractor.Formats.Pdf
 
         private readonly List<Token> _buffer;
 
+        private bool _endReached;
+
         public TokenProvider(IEnumerable<Token> tokens)
         {
             _tokens = tokens.GetEnumerator();
 
             _buffer = new List<Token>(5); // we don't usually need to peek ahead that much
+
+            _endReached = false;
+        }
+
+        public bool HasNextToken()
+        {
+            return PeekNextToken(0).Type != "dummy";
         }
 
         public Token GetNextToken()
