@@ -369,6 +369,44 @@ namespace MetadataExtractor.Formats.Pdf
             return true;
         }
 
+        public bool TryMatchNumericToken([NotNullWhen(true)] out Token? token)
+        {
+            StringBuilder test = new StringBuilder();
+            bool isDecimal = false;
+            for (int i = 0; ; i++)
+            {
+                byte nextByte = PeekByte(i);
+                if ((nextByte >= (byte)'0' && nextByte <= (byte)'9') || nextByte == (byte)'-' || nextByte == (byte)'+')
+                {
+                    test.Append((char)nextByte);
+                }
+                else if (nextByte == (byte)'.')
+                {
+                    test.Append((char)nextByte);
+                    isDecimal = true;
+                }
+                else
+                {
+                    string strValue = test.ToString();
+                    if (isDecimal && decimal.TryParse(strValue, out decimal decimalValue))
+                    {
+                        token = new NumericRealToken(decimalValue, strValue.ToCharArray().Select(x => (byte)x).ToArray());
+                        return true;
+                    }
+                    else if (int.TryParse(strValue, out int intValue))
+                    {
+                        token = new NumericIntegerToken(intValue, strValue.ToCharArray().Select(x => (byte)x).ToArray());
+                        return true;
+                    }
+                    else
+                    {
+                        token = null;
+                        return false;
+                    }
+                }
+            }
+        }
+
         public void Consume(int count)
         {
             if (_index + count >= Length)
@@ -499,16 +537,30 @@ namespace MetadataExtractor.Formats.Pdf
         public BooleanFalseToken() : base("false".ToCharArray().Select(x => (byte)x).ToArray()) { }
     }
 
-    internal class NumericIntegerToken : Token
+    public class NumericIntegerToken : Token
     {
+        public decimal IntegerValue { get; }
+
         public override string Type => "numeric-integer";
-        public NumericIntegerToken(int value) : base(value.ToString().ToCharArray().Select(x => (byte)x).ToArray()) { }
+
+        public NumericIntegerToken(int value, byte[] rawValue)
+            : base(rawValue)
+        {
+            IntegerValue = value;
+        }
     }
 
-    internal class NumericRealToken : Token
+    public class NumericRealToken : Token
     {
+        public decimal RealValue { get; }
+
         public override string Type => "numeric-real";
-        public NumericRealToken(decimal value) : base(value.ToString().ToCharArray().Select(x => (byte)x).ToArray()) { }
+
+        public NumericRealToken(decimal value, byte[] rawValue)
+            : base(rawValue)
+        {
+            RealValue = value;
+        }
     }
 
     internal class ArrayBeginToken : Token
