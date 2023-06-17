@@ -264,7 +264,8 @@ namespace MetadataExtractor.Formats.Pdf
         public bool MatchToken(string token)
         {
             byte[] needle = Encoding.ASCII.GetBytes(token.ToCharArray());
-            if (!PdfReader.WhitespaceChars.Contains(PeekByte(needle.Length)))
+            byte byteAfterLast = PeekByte(needle.Length);
+            if (!PdfReader.WhitespaceChars.Contains(byteAfterLast) && byteAfterLast != (byte)']' && byteAfterLast != (byte)'>')
             {
                 return false;
             }
