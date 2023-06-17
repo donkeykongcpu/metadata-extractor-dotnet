@@ -128,7 +128,10 @@ namespace MetadataExtractor.Formats.Pdf
             {
                 if (_currentKey is not null)
                 {
-                    _dictionary.Add(_currentKey, value);
+                    if (value is not NullToken)
+                    {
+                        _dictionary.Add(_currentKey, value);
+                    }
                     _currentKey = null;
                 }
                 else
@@ -142,7 +145,10 @@ namespace MetadataExtractor.Formats.Pdf
                 {
                     return;
                 }
-                _dictionary.Add(_currentKey, value);
+                if (value is not NullToken)
+                {
+                    _dictionary.Add(_currentKey, value);
+                }
                 _currentKey = null;
             }
         }
