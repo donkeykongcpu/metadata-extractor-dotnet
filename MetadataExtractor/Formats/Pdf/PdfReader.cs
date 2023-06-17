@@ -352,6 +352,23 @@ namespace MetadataExtractor.Formats.Pdf
             return true;
         }
 
+        public bool MatchToken(string token)
+        {
+            byte[] needle = Encoding.ASCII.GetBytes(token.ToCharArray());
+            if (!PdfReader.WhitespaceChars.Contains(PeekByte(needle.Length)))
+            {
+                return false;
+            }
+            for (int i = 0; i < needle.Length; i++)
+            {
+                if (needle[i] != PeekByte(i))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         public void Consume(int count)
         {
             if (_index + count >= Length)
@@ -462,6 +479,36 @@ namespace MetadataExtractor.Formats.Pdf
             if (other.Type != Type) return false;
             return Value.EqualTo(other.Value);
         }
+    }
+
+    internal class NullToken : Token
+    {
+        public override string Type => "null";
+        public NullToken() : base("null".ToCharArray().Select(x => (byte)x).ToArray()) { }
+    }
+
+    internal class BooleanTrueToken : Token
+    {
+        public override string Type => "true";
+        public BooleanTrueToken() : base("true".ToCharArray().Select(x => (byte)x).ToArray()) { }
+    }
+
+    internal class BooleanFalseToken : Token
+    {
+        public override string Type => "false";
+        public BooleanFalseToken() : base("false".ToCharArray().Select(x => (byte)x).ToArray()) { }
+    }
+
+    internal class NumericIntegerToken : Token
+    {
+        public override string Type => "numeric-integer";
+        public NumericIntegerToken(int value) : base(value.ToString().ToCharArray().Select(x => (byte)x).ToArray()) { }
+    }
+
+    internal class NumericRealToken : Token
+    {
+        public override string Type => "numeric-real";
+        public NumericRealToken(decimal value) : base(value.ToString().ToCharArray().Select(x => (byte)x).ToArray()) { }
     }
 
     internal class ArrayBeginToken : Token
