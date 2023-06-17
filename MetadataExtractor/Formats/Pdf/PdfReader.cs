@@ -522,6 +522,17 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
+    public class CommentToken : Token
+    {
+        public override string Type => "comment";
+
+        public CommentToken(byte[] value)
+            : base(value)
+        {
+            // the value does not include the leading slash (/)
+        }
+    }
+
     internal abstract class TokeniseContext
     {
         private List<byte> _token;
@@ -799,6 +810,33 @@ namespace MetadataExtractor.Formats.Pdf
                     Provider.Consume(3);
                     byte value = (byte)(digit1 * 16 + digit2);
                     Append(value);
+                }
+                else
+                {
+                    byte nextByte = Provider.GetNextByte();
+                    Append(nextByte);
+                }
+            }
+        }
+    }
+
+    internal class CommentTokeniseContext : TokeniseContext
+    {
+        public CommentTokeniseContext(ByteProvider provider)
+            : base("comment", provider)
+        {
+
+        }
+
+        public override IEnumerable<Token> Consume()
+        {
+            while (true)
+            {
+                if (!Provider.HasNextByte() || Provider.PeekByte(0) == (byte)'\r' || Provider.PeekByte(0) == (byte)'\n')
+                {
+                    Provider.Consume(1);
+                    yield return new CommentToken(GetToken()); // does not include the leading percent sign (%)
+                    yield break; // done with this comment
                 }
                 else
                 {
