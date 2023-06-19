@@ -56,6 +56,14 @@ namespace MetadataExtractor.Formats.Pdf
             return _buffer[(_start + delta) % _buffer.Length];
         }
 
+        protected void Consume(int count)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                GetNextItem();
+            }
+        }
+
         private bool IsItemAvailableInBuffer(int delta)
         {
             return (delta + 1 <= _count);
@@ -134,6 +142,26 @@ namespace MetadataExtractor.Formats.Pdf
 
         private int _index; // the index of the next byte to be returned (can go above _availableLength when extracting forward, or below zero when extracting backward, indicating the end of input)
 
+        private int _bytesRead;
+
+        public bool HasNextItem
+        {
+            get
+            {
+                int remainingItems = _extractionDirection == ExtractionDirection.Forward
+                    ? Math.Max(0, (int)_availableLength - _index)
+                    : Math.Max(0, _index + 1)
+                ;
+
+                return remainingItems > 0;
+            }
+        }
+
+        public int BytesRead
+        {
+            get => _bytesRead;
+        }
+
         protected ByteStreamBufferedProvider(long availableLength, int startIndex, int bufferLength, ExtractionDirection extractionDirection)
             : base(bufferLength)
         {
@@ -142,6 +170,40 @@ namespace MetadataExtractor.Formats.Pdf
             _availableLength = availableLength;
 
             _index = _extractionDirection == ExtractionDirection.Forward ? startIndex : (int)availableLength - 1;
+        }
+
+        public bool MatchMarker(string marker)
+        {
+            // marker should contain only 1-byte characters
+            return MatchMarker(marker.ToCharArray().Select(x => (byte)x).ToArray());
+        }
+
+        public bool MatchMarker(byte[] marker)
+        {
+            for (int i = 0; i < marker.Length; i++)
+            {
+                if (marker[i] != PeekNextItem(i))
+                {
+                    return false;
+                }
+            }
+            Consume(marker.Length);
+            return true;
+        }
+
+        public bool MatchEndOfLineMarker()
+        {
+            if (PeekNextItem(0) == (byte)'\r' && PeekNextItem(1) == (byte)'\n')
+            {
+                Consume(2);
+                return true;
+            }
+            else if (PeekNextItem(0) == (byte)'\r' || PeekNextItem(1) == (byte)'\n')
+            {
+                Consume(1);
+                return true;
+            }
+            return false;
         }
 
         sealed protected override byte[] GetNextItems(int count)
@@ -159,6 +221,7 @@ namespace MetadataExtractor.Formats.Pdf
             {
                 int startIndex = _index;
                 _index += count;
+                _bytesRead += count;
                 return GetBytes(startIndex, count);
             }
             else
@@ -169,6 +232,7 @@ namespace MetadataExtractor.Formats.Pdf
                 {
                     int startIndex = _index;
                     _index += count;
+                    _bytesRead += remainingItems;
                     result.AddRange(GetBytes(startIndex, remainingItems));
                 }
                 result.AddRange(new byte[count - remainingItems]);
@@ -184,6 +248,7 @@ namespace MetadataExtractor.Formats.Pdf
             {
                 int startIndex = _index - count + 1;
                 _index -= count;
+                _bytesRead += count;
                 return GetBytes(startIndex, count).Reverse().ToArray();
             }
             else
@@ -194,6 +259,7 @@ namespace MetadataExtractor.Formats.Pdf
                 {
                     int startIndex = _index - count + 1;
                     _index -= count;
+                    _bytesRead += remainingItems;
                     result.AddRange(GetBytes(startIndex, remainingItems).Reverse().ToArray());
                 }
                 result.AddRange(new byte[count - remainingItems]);
