@@ -257,7 +257,7 @@ namespace MetadataExtractor.Formats.Pdf
                 List<byte> result = new List<byte>();
                 if (remainingItems > 0)
                 {
-                    int startIndex = _index - count + 1;
+                    int startIndex = _index - remainingItems + 1;
                     _index -= count;
                     _bytesRead += remainingItems;
                     result.AddRange(GetBytes(startIndex, remainingItems).Reverse().ToArray());
