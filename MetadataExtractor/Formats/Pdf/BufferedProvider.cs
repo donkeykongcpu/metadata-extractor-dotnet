@@ -39,6 +39,18 @@ namespace MetadataExtractor.Formats.Pdf
             return result;
         }
 
+        public ItemType[] GetNextItems(int count)
+        {
+            List<ItemType> result = new List<ItemType>();
+
+            for (int i = 0; i < count; i++)
+            {
+                result.Add(GetNextItem());
+            }
+
+            return result.ToArray();
+        }
+
         public ItemType PeekNextItem(int delta)
         {
             if (delta >= _buffer.Length)
@@ -75,7 +87,7 @@ namespace MetadataExtractor.Formats.Pdf
 
             Debug.Assert(itemsToRead > 0);
 
-            ItemType[] items = GetNextItems(itemsToRead);
+            ItemType[] items = GetNextItemsFromSource(itemsToRead);
 
             foreach (ItemType item in items)
             {
@@ -87,7 +99,7 @@ namespace MetadataExtractor.Formats.Pdf
             }
         }
 
-        protected abstract ItemType[] GetNextItems(int count);
+        protected abstract ItemType[] GetNextItemsFromSource(int count);
     }
 
     internal class EnumeratedBufferedProvider<ItemType> : BufferedProvider<ItemType>
@@ -104,7 +116,7 @@ namespace MetadataExtractor.Formats.Pdf
             _missingItemSentinel = missingItemSentinel;
         }
 
-        sealed protected override ItemType[] GetNextItems(int count)
+        sealed protected override ItemType[] GetNextItemsFromSource(int count)
         {
             List<ItemType> result = new List<ItemType>(count);
             for (int i = 0; i < count; i++)
@@ -206,7 +218,7 @@ namespace MetadataExtractor.Formats.Pdf
             return false;
         }
 
-        sealed protected override byte[] GetNextItems(int count)
+        sealed protected override byte[] GetNextItemsFromSource(int count)
         {
             return _extractionDirection == ExtractionDirection.Forward ? GetNextItemsForward(count) : GetNextItemsBackward(count);
         }
@@ -269,7 +281,7 @@ namespace MetadataExtractor.Formats.Pdf
 
         public byte[] TestGetNextItems(int count)
         {
-            return GetNextItems(count);
+            return GetNextItemsFromSource(count);
         }
     }
 
