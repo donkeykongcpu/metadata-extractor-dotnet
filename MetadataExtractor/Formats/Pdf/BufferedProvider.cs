@@ -120,21 +120,38 @@ namespace MetadataExtractor.Formats.Pdf
         //}
     }
 
+    internal enum ExtractionDirection
+    {
+        Forward,
+        Backward,
+    }
+
     internal abstract class ByteStreamBufferedProvider : BufferedProvider<byte>
     {
-        private long _availableLength;
+        private readonly ExtractionDirection _extractionDirection;
 
-        private int _index;
+        private readonly long _availableLength;
 
-        protected ByteStreamBufferedProvider(long availableLength, int startIndex, int bufferLength)
+        private int _index; // the index of the next byte to be returned (can go above _availableLength when extracting forward, or below zero when extracting backward, indicating the end of input)
+
+        protected ByteStreamBufferedProvider(long availableLength, int startIndex, int bufferLength, ExtractionDirection extractionDirection)
             : base(bufferLength)
         {
+            _extractionDirection = extractionDirection;
+
             _availableLength = availableLength;
 
-            _index = startIndex;
+            _index = _extractionDirection == ExtractionDirection.Forward ? startIndex : (int)availableLength - 1;
         }
 
         sealed protected override byte[] GetNextItems(int count)
+        {
+            return _extractionDirection == ExtractionDirection.Forward ? GetNextItemsForward(count) : GetNextItemsBackward(count);
+        }
+
+        protected abstract byte[] GetBytes(int index, int count);
+
+        private byte[] GetNextItemsForward(int count)
         {
             int remainingItems = Math.Max(0, (int)_availableLength - _index);
 
@@ -159,20 +176,43 @@ namespace MetadataExtractor.Formats.Pdf
             }
         }
 
-        protected abstract byte[] GetBytes(int index, int count);
+        private byte[] GetNextItemsBackward(int count)
+        {
+            int remainingItems = Math.Max(0, _index + 1);
 
-        //public byte[] TestGetNextItems(int count)
-        //{
-        //    return GetNextItems(count);
-        //}
+            if (count <= remainingItems)
+            {
+                int startIndex = _index - count + 1;
+                _index -= count;
+                return GetBytes(startIndex, count).Reverse().ToArray();
+            }
+            else
+            {
+                // return all remaining items, adding zero bytes for the missing items
+                List<byte> result = new List<byte>();
+                if (remainingItems > 0)
+                {
+                    int startIndex = _index - count + 1;
+                    _index -= count;
+                    result.AddRange(GetBytes(startIndex, remainingItems).Reverse().ToArray());
+                }
+                result.AddRange(new byte[count - remainingItems]);
+                return result.ToArray();
+            }
+        }
+
+        public byte[] TestGetNextItems(int count)
+        {
+            return GetNextItems(count);
+        }
     }
 
     internal class IndexedReaderByteProvider : ByteStreamBufferedProvider
     {
         private readonly IndexedReader _reader;
 
-        public IndexedReaderByteProvider(IndexedReader reader, int startIndex, int bufferLength)
-            : base(reader.Length, startIndex, bufferLength)
+        public IndexedReaderByteProvider(IndexedReader reader, int startIndex, int bufferLength, ExtractionDirection extractionDirection)
+            : base(reader.Length, startIndex, bufferLength, extractionDirection)
         {
             _reader = reader;
         }
@@ -187,8 +227,8 @@ namespace MetadataExtractor.Formats.Pdf
     {
         private readonly byte[] _input;
 
-        public StringByteProvider2(string input, int startIndex, int bufferLength)
-            : base(input.Length, startIndex, bufferLength)
+        public StringByteProvider2(string input, int startIndex, int bufferLength, ExtractionDirection extractionDirection)
+            : base(input.Length, startIndex, bufferLength, extractionDirection)
         {
             // input string must only contain 1-byte characters
 
