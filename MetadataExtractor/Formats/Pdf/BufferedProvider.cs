@@ -14,6 +14,11 @@ namespace MetadataExtractor.Formats.Pdf
 
         private int _count; // the number of items that are available in the circular buffer (in case _start == _end, the circular buffer can be completely empty or completely full)
 
+        public int BufferLength
+        {
+            get => _buffer.Length;
+        }
+
         protected BufferedProvider(int bufferLength)
         {
             _buffer = new ItemType[bufferLength];
@@ -41,7 +46,7 @@ namespace MetadataExtractor.Formats.Pdf
 
         public ItemType[] GetNextItems(int count)
         {
-            List<ItemType> result = new List<ItemType>();
+            List<ItemType> result = new List<ItemType>(count);
 
             for (int i = 0; i < count; i++)
             {
@@ -68,7 +73,7 @@ namespace MetadataExtractor.Formats.Pdf
             return _buffer[(_start + delta) % _buffer.Length];
         }
 
-        protected void Consume(int count)
+        public void Consume(int count)
         {
             for (int i = 0; i < count; i++)
             {
@@ -279,10 +284,10 @@ namespace MetadataExtractor.Formats.Pdf
             }
         }
 
-        public byte[] TestGetNextItems(int count)
-        {
-            return GetNextItemsFromSource(count);
-        }
+        //public byte[] TestGetNextItems(int count)
+        //{
+        //    return GetNextItemsFromSource(count);
+        //}
     }
 
     internal class IndexedReaderByteProvider : ByteStreamBufferedProvider
