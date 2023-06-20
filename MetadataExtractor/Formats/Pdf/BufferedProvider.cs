@@ -16,15 +16,9 @@ namespace MetadataExtractor.Formats.Pdf
 
         private int _itemsConsumed;
 
-        public int BufferLength
-        {
-            get => _buffer.Length;
-        }
+        public int BufferLength => _buffer.Length;
 
-        public int ItemsConsumed
-        {
-            get => _itemsConsumed;
-        }
+        public int ItemsConsumed => _itemsConsumed;
 
         protected BufferedProvider(int bufferLength)
         {
@@ -127,10 +121,7 @@ namespace MetadataExtractor.Formats.Pdf
 
         private readonly DummyItemType _missingItemSentinel;
 
-        public bool HasNextItem
-        {
-            get => PeekNextItem(0) is not DummyItemType;
-        }
+        public bool HasNextItem => PeekNextItem(0) is not DummyItemType;
 
         public EnumeratedBufferedProvider(IEnumerable<ItemType> sequence, DummyItemType missingItemSentinel, int bufferLength)
             : base(bufferLength)
@@ -180,15 +171,9 @@ namespace MetadataExtractor.Formats.Pdf
 
         private int _bytesRead;
 
-        public bool HasNextItem
-        {
-            get => ItemsConsumed < _availableLength;
-        }
+        public bool HasNextItem => ItemsConsumed < _availableLength;
 
-        public int BytesRead
-        {
-            get => _bytesRead;
-        }
+        public int BytesRead => _bytesRead;
 
         protected ByteStreamBufferedProvider(long availableLength, int startIndex, int bufferLength, ExtractionDirection extractionDirection)
             : base(bufferLength)
