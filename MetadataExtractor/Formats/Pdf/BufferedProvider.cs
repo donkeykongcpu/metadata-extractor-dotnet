@@ -67,6 +67,11 @@ namespace MetadataExtractor.Formats.Pdf
 
         public ItemType PeekNextItem(int delta)
         {
+            if (delta < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(delta), "Cannot peek previous items");
+            }
+
             if (delta >= _buffer.Length)
             {
                 throw new ArgumentOutOfRangeException(nameof(delta), "Cannot peek that far ahead");
@@ -116,13 +121,18 @@ namespace MetadataExtractor.Formats.Pdf
         protected abstract ItemType[] GetNextItemsFromSource(int count);
     }
 
-    internal class EnumeratedBufferedProvider<ItemType> : BufferedProvider<ItemType>
+    internal class EnumeratedBufferedProvider<ItemType, DummyItemType> : BufferedProvider<ItemType> where DummyItemType : ItemType
     {
         private readonly IEnumerator<ItemType> _enumerator;
 
-        private readonly ItemType _missingItemSentinel;
+        private readonly DummyItemType _missingItemSentinel;
 
-        public EnumeratedBufferedProvider(IEnumerable<ItemType> sequence, ItemType missingItemSentinel, int bufferLength)
+        public bool HasNextItem
+        {
+            get => PeekNextItem(0) is not DummyItemType;
+        }
+
+        public EnumeratedBufferedProvider(IEnumerable<ItemType> sequence, DummyItemType missingItemSentinel, int bufferLength)
             : base(bufferLength)
         {
             _enumerator = sequence.GetEnumerator();

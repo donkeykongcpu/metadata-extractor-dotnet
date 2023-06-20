@@ -97,7 +97,7 @@ namespace MetadataExtractor.Formats.Pdf
             return matched;
         }
 
-        public bool MatchEndOfLine()
+        private bool MatchEndOfLine()
         {
             if (_byteProvider.PeekNextItem(0) == (byte)'\r' && _byteProvider.PeekNextItem(1) == (byte)'\n')
             {
