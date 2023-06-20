@@ -226,5 +226,10 @@ namespace MetadataExtractor.Formats.Pdf
         {
             // the value does not include the leading slash (/)
         }
+
+        public override string ToString()
+        {
+            return Encoding.ASCII.GetString(Value); // only used for debugging
+        }
     }
 }

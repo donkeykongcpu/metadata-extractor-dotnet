@@ -78,7 +78,13 @@ namespace MetadataExtractor.Formats.Pdf
             bool matched = false;
             while (true)
             {
-                if (PdfReader.WhitespaceChars.Contains(_byteProvider.PeekNextItem(0)))
+                if (!_byteProvider.HasNextItem)
+                {
+                    // NOTE zero bytes are returned once end is reached, which are also considered whitespace
+                    matched = true;
+                    break;
+                }
+                else if (PdfReader.WhitespaceChars.Contains(_byteProvider.PeekNextItem(0)))
                 {
                     matched = true;
                     _byteProvider.Consume(1);
@@ -98,7 +104,7 @@ namespace MetadataExtractor.Formats.Pdf
                 _byteProvider.Consume(2);
                 return true;
             }
-            else if (_byteProvider.PeekNextItem(0) == (byte)'\r' || _byteProvider.PeekNextItem(1) == (byte)'\n')
+            else if (_byteProvider.PeekNextItem(0) == (byte)'\r' || _byteProvider.PeekNextItem(0) == (byte)'\n')
             {
                 _byteProvider.Consume(1);
                 return true;
@@ -362,6 +368,7 @@ namespace MetadataExtractor.Formats.Pdf
                 }
                 else if (_byteProvider.PeekNextItem(0) == (byte)'#')
                 {
+                    _byteProvider.Consume(1);
                     // the following two bytes must be hex digits
                     byte digit1;
                     byte digit2;
@@ -373,7 +380,6 @@ namespace MetadataExtractor.Formats.Pdf
                     {
                         throw new Exception("Unexpected byte");
                     }
-                    _byteProvider.Consume(1); // consume #
                     byte value = (byte)(digit1 * 16 + digit2);
                     bytes.Add(value);
                 }

@@ -172,15 +172,7 @@ namespace MetadataExtractor.Formats.Pdf
 
         public bool HasNextItem
         {
-            get
-            {
-                int remainingItems = _extractionDirection == ExtractionDirection.Forward
-                    ? Math.Max(0, (int)_availableLength - _index)
-                    : Math.Max(0, _index + 1)
-                ;
-
-                return remainingItems > 0;
-            }
+            get => ItemsConsumed < _availableLength;
         }
 
         public int BytesRead
