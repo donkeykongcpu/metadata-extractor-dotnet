@@ -155,6 +155,8 @@ namespace MetadataExtractor.Formats.Pdf
     {
         public override string Type => "string";
 
+        public StringValue StringValue => new StringValue(Value); // TODO encoding is context-specific
+
         public StringToken(byte[] value)
             : base(value)
         {
@@ -163,7 +165,7 @@ namespace MetadataExtractor.Formats.Pdf
 
         public override string ToString()
         {
-            return Encoding.ASCII.GetString(Value); // TODO: encoding is context-specific
+            return Encoding.ASCII.GetString(Value); // TODO encoding is context-specific
         }
 
         public string ToASCIIString()
@@ -180,6 +182,8 @@ namespace MetadataExtractor.Formats.Pdf
     public class NameToken : Token
     {
         public override string Type => "name";
+
+        public StringValue StringValue => new StringValue(Value, Encoding.UTF8);
 
         public NameToken(byte[] value)
             : base(value)
