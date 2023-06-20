@@ -14,16 +14,23 @@ namespace MetadataExtractor.Formats.Pdf
 
         private int _count; // the number of items that are available in the circular buffer (in case _start == _end, the circular buffer can be completely empty or completely full)
 
+        private int _itemsConsumed;
+
         public int BufferLength
         {
             get => _buffer.Length;
+        }
+
+        public int ItemsConsumed
+        {
+            get => _itemsConsumed;
         }
 
         protected BufferedProvider(int bufferLength)
         {
             _buffer = new ItemType[bufferLength];
 
-            _start = _end = _count = 0;
+            _start = _end = _count = _itemsConsumed = 0;
         }
 
         public ItemType GetNextItem()
@@ -40,6 +47,8 @@ namespace MetadataExtractor.Formats.Pdf
             _start = (_start + 1) % _buffer.Length;
 
             _count--;
+
+            _itemsConsumed++;
 
             return result;
         }
@@ -189,40 +198,6 @@ namespace MetadataExtractor.Formats.Pdf
             _index = _extractionDirection == ExtractionDirection.Forward ? startIndex : (int)availableLength - 1;
         }
 
-        public bool MatchMarker(string marker)
-        {
-            // marker should contain only 1-byte characters
-            return MatchMarker(marker.ToCharArray().Select(x => (byte)x).ToArray());
-        }
-
-        public bool MatchMarker(byte[] marker)
-        {
-            for (int i = 0; i < marker.Length; i++)
-            {
-                if (marker[i] != PeekNextItem(i))
-                {
-                    return false;
-                }
-            }
-            Consume(marker.Length);
-            return true;
-        }
-
-        public bool MatchEndOfLineMarker()
-        {
-            if (PeekNextItem(0) == (byte)'\r' && PeekNextItem(1) == (byte)'\n')
-            {
-                Consume(2);
-                return true;
-            }
-            else if (PeekNextItem(0) == (byte)'\r' || PeekNextItem(1) == (byte)'\n')
-            {
-                Consume(1);
-                return true;
-            }
-            return false;
-        }
-
         sealed protected override byte[] GetNextItemsFromSource(int count)
         {
             return _extractionDirection == ExtractionDirection.Forward ? GetNextItemsForward(count) : GetNextItemsBackward(count);
@@ -302,15 +277,18 @@ namespace MetadataExtractor.Formats.Pdf
 
         protected override byte[] GetBytes(int index, int count)
         {
+            Debug.Assert(index >= 0);
+            Debug.Assert(count > 0);
+
             return _reader.GetBytes(index, count);
         }
     }
 
-    internal class StringByteProvider2 : ByteStreamBufferedProvider
+    internal class StringByteProvider : ByteStreamBufferedProvider
     {
         private readonly byte[] _input;
 
-        public StringByteProvider2(string input, int startIndex, int bufferLength, ExtractionDirection extractionDirection)
+        public StringByteProvider(string input, int startIndex, int bufferLength, ExtractionDirection extractionDirection)
             : base(input.Length, startIndex, bufferLength, extractionDirection)
         {
             // input string must only contain 1-byte characters
