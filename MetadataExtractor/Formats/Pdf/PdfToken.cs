@@ -36,28 +36,6 @@ namespace MetadataExtractor.Formats.Pdf
         public DummyToken() : base("dummy") { }
     }
 
-    internal class IndirectReferenceToken : Token
-    {
-        public uint ObjectNumber { get; }
-
-        public ushort Generation { get; }
-
-        public override string Type => "indirect-reference";
-
-        public IndirectReferenceToken(int objectNumber, int generation)
-            : base(new byte[] { })
-        {
-            ObjectNumber = (uint)objectNumber;
-
-            Generation = (ushort)generation;
-        }
-
-        public override string ToString()
-        {
-            return "{@" + ObjectNumber + " " + Generation + "}";
-        }
-    }
-
     internal class IndirectReferenceMarkerToken : Token
     {
         public override string Type => "R";

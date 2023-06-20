@@ -10,10 +10,11 @@ namespace MetadataExtractor.Formats.Pdf
         {
             private readonly Stack<PdfObject> _stack;
 
-            private string ContextType
-            {
-                get => _stack.Peek().Type;
-            }
+            public bool IsRoot => _stack.Peek().Type == "root";
+
+            public bool HasValue => _stack.Peek().HasValue;
+
+            private string ContextType => _stack.Peek().Type;
 
             public ParseContext()
             {
@@ -21,9 +22,14 @@ namespace MetadataExtractor.Formats.Pdf
                 _stack.Push(new PdfRoot());
             }
 
-            public void Add(object? value)
+            public void Add(PdfObject value)
             {
                 _stack.Peek().Add(value);
+            }
+
+            public void Add(Token token)
+            {
+                _stack.Peek().Add(token);
             }
 
             public void StartContext(string type)
@@ -75,7 +81,7 @@ namespace MetadataExtractor.Formats.Pdf
         {
             var parseContext = new ParseContext();
 
-            while (_tokenProvider.HasNextItem)
+            while (true)
             {
                 // first check if we have either an indirect object (objectNumber generation "obj" ... "endobj")
                 // or an indirect reference to an object (objectNumber generation "R")
@@ -92,7 +98,7 @@ namespace MetadataExtractor.Formats.Pdf
                     }
                     else if (_tokenProvider.PeekNextItem(2) is IndirectReferenceMarkerToken)
                     {
-                        parseContext.Add(new IndirectReferenceToken(objectNumber, generation));
+                        parseContext.Add(new PdfIndirectReference(objectNumber, generation));
                         _tokenProvider.Consume(3);
                     }
                 }
@@ -121,8 +127,18 @@ namespace MetadataExtractor.Formats.Pdf
                 }
                 else
                 {
+                    if (parseContext.IsRoot && parseContext.HasValue)
+                    {
+                        yield return parseContext.GetValue();
+                    }
                     parseContext.Add(nextToken);
+                    if (nextToken is DummyToken)
+                    {
+                        yield break;
+                    }
                 }
+
+              
 
 
                 //if (nextToken == "stream")
@@ -149,7 +165,6 @@ namespace MetadataExtractor.Formats.Pdf
 
             }
 
-            yield return parseContext.GetValue();
         }
 
 
