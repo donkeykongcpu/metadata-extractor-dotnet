@@ -17,21 +17,23 @@ namespace MetadataExtractor.Formats.Pdf
         {
             while (_byteProvider.HasNextItem)
             {
+                int currentIndex = _byteProvider.CurrentIndex;
+
                 if (MatchWhitespace()) continue;
-                else if (MatchToken("R")) yield return new IndirectReferenceMarkerToken();
-                else if (MatchToken("obj")) yield return new IndirectObjectBeginToken();
-                else if (MatchToken("endobj")) yield return new IndirectObjectEndToken();
-                else if (MatchToken("stream")) yield return new StreamBeginToken();
-                else if (MatchToken("endstream")) yield return new StreamEndToken();
-                else if (MatchToken("null")) yield return new NullToken();
-                else if (MatchToken("true")) yield return new BooleanToken(true);
-                else if (MatchToken("false")) yield return new BooleanToken(false);
+                else if (MatchToken("R")) yield return new IndirectReferenceMarkerToken(currentIndex);
+                else if (MatchToken("obj")) yield return new IndirectObjectBeginToken(currentIndex);
+                else if (MatchToken("endobj")) yield return new IndirectObjectEndToken(currentIndex);
+                else if (MatchToken("stream")) yield return new StreamBeginToken(currentIndex);
+                else if (MatchToken("endstream")) yield return new StreamEndToken(currentIndex);
+                else if (MatchToken("null")) yield return new NullToken(currentIndex);
+                else if (MatchToken("true")) yield return new BooleanToken(true, currentIndex);
+                else if (MatchToken("false")) yield return new BooleanToken(false, currentIndex);
                 else if (TryMatchNumericToken(out Token? numericToken)) yield return numericToken;
                 else if (TryMatchLiteralString(out StringToken? literalStringToken)) yield return literalStringToken;
-                else if (MatchDelimiter("[")) yield return new ArrayBeginToken();
-                else if (MatchDelimiter("]")) yield return new ArrayEndToken();
-                else if (MatchDelimiter("<<")) yield return new DictionaryBeginToken();
-                else if (MatchDelimiter(">>")) yield return new DictionaryEndToken();
+                else if (MatchDelimiter("[")) yield return new ArrayBeginToken(currentIndex);
+                else if (MatchDelimiter("]")) yield return new ArrayEndToken(currentIndex);
+                else if (MatchDelimiter("<<")) yield return new DictionaryBeginToken(currentIndex);
+                else if (MatchDelimiter(">>")) yield return new DictionaryEndToken(currentIndex);
                 else if (TryMatchHexadecimalString(out StringToken? hexStringToken)) yield return hexStringToken;
                 else if (TryMatchName(out NameToken? nameToken)) yield return nameToken;
                 else if (TryMatchComment(out CommentToken? commentToken)) yield return commentToken;
@@ -114,6 +116,7 @@ namespace MetadataExtractor.Formats.Pdf
 
         private bool TryMatchNumericToken([NotNullWhen(true)] out Token? token)
         {
+            int currentIndex = _byteProvider.CurrentIndex;
             List<byte> bytes = new List<byte>();
             bool isDecimal = false;
             for (int i = 0; ; i++)
@@ -134,13 +137,13 @@ namespace MetadataExtractor.Formats.Pdf
                     string strValue = Encoding.ASCII.GetString(byteArray);
                     if (isDecimal && decimal.TryParse(strValue, out var decimalValue))
                     {
-                        token = new NumericRealToken(decimalValue, byteArray);
+                        token = new NumericRealToken(decimalValue, byteArray, currentIndex);
                         _byteProvider.Consume(byteArray.Length);
                         return true;
                     }
                     else if (int.TryParse(strValue, out var intValue))
                     {
-                        token = new NumericIntegerToken(intValue, byteArray);
+                        token = new NumericIntegerToken(intValue, byteArray, currentIndex);
                         _byteProvider.Consume(byteArray.Length);
                         return true;
                     }
@@ -199,6 +202,7 @@ namespace MetadataExtractor.Formats.Pdf
 
         private bool TryMatchHexadecimalString([NotNullWhen(true)] out StringToken? token)
         {
+            int currentIndex = _byteProvider.CurrentIndex;
             List<byte> bytes = new List<byte>();
             if (_byteProvider.PeekNextItem(0) != (byte)'<')
             {
@@ -226,7 +230,7 @@ namespace MetadataExtractor.Formats.Pdf
                         byte value = (byte)(bytes[i] * 16 + bytes[i + 1]);
                         result.Add(value);
                     }
-                    token = new StringToken(result.ToArray());
+                    token = new StringToken(result.ToArray(), currentIndex);
                     return true; // success!
                 }
                 else if (TryMatchHexadecimalDigit(out byte result))
@@ -246,6 +250,7 @@ namespace MetadataExtractor.Formats.Pdf
 
         private bool TryMatchLiteralString([NotNullWhen(true)] out StringToken? token)
         {
+            int currentIndex = _byteProvider.CurrentIndex;
             List<byte> bytes = new List<byte>();
             int balanceCounter = 0;
             if (_byteProvider.PeekNextItem(0) != (byte)'(')
@@ -274,7 +279,7 @@ namespace MetadataExtractor.Formats.Pdf
                     balanceCounter--;
                     if (balanceCounter == 0)
                     {
-                        token = new StringToken(bytes.ToArray());
+                        token = new StringToken(bytes.ToArray(), currentIndex);
                         return true; // success!
                     }
                     else
@@ -352,6 +357,7 @@ namespace MetadataExtractor.Formats.Pdf
 
         private bool TryMatchName([NotNullWhen(true)] out NameToken? token)
         {
+            int currentIndex = _byteProvider.CurrentIndex;
             List<byte> bytes = new List<byte>();
             if (_byteProvider.PeekNextItem(0) != (byte)'/')
             {
@@ -363,7 +369,7 @@ namespace MetadataExtractor.Formats.Pdf
             {
                 if (!_byteProvider.HasNextItem || MatchWhitespace())
                 {
-                    token = new NameToken(bytes.ToArray()); // does not include the leading slash (/)
+                    token = new NameToken(bytes.ToArray(), currentIndex); // does not include the leading slash (/)
                     return true; // success!
                 }
                 else if (_byteProvider.PeekNextItem(0) == (byte)'#')
@@ -393,6 +399,7 @@ namespace MetadataExtractor.Formats.Pdf
 
         private bool TryMatchComment([NotNullWhen(true)] out CommentToken? token)
         {
+            int currentIndex = _byteProvider.CurrentIndex;
             List<byte> bytes = new List<byte>();
             if (_byteProvider.PeekNextItem(0) != (byte)'%')
             {
@@ -404,7 +411,7 @@ namespace MetadataExtractor.Formats.Pdf
             {
                 if (!_byteProvider.HasNextItem || MatchEndOfLine())
                 {
-                    token = new CommentToken(bytes.ToArray()); // does not include the leading percent sign (%)
+                    token = new CommentToken(bytes.ToArray(), currentIndex); // does not include the leading percent sign (%)
                     return true; // success!
                 }
                 else

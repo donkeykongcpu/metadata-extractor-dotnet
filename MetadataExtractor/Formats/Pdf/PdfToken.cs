@@ -10,16 +10,22 @@ namespace MetadataExtractor.Formats.Pdf
 
         public byte[] Value { get; }
 
-        protected Token(byte[] value)
+        public int StartIndex { get; }
+
+        protected Token(byte[] value, int startIndex)
         {
             Value = value;
+
+            StartIndex = startIndex;
         }
 
-        protected Token(string value)
+        protected Token(string value, int startIndex)
         {
             // value should only contain 1-byte characters
 
             Value = value.ToCharArray().Select(x => (byte)x).ToArray();
+
+            StartIndex = startIndex;
         }
 
         public bool Equals(Token other)
@@ -33,43 +39,43 @@ namespace MetadataExtractor.Formats.Pdf
     internal class DummyToken : Token
     {
         public override string Type => "dummy";
-        public DummyToken() : base("dummy") { }
+        public DummyToken() : base("dummy", -1) { }
     }
 
     internal class IndirectReferenceMarkerToken : Token
     {
         public override string Type => "R";
-        public IndirectReferenceMarkerToken() : base("R") { }
+        public IndirectReferenceMarkerToken(int startIndex) : base("R", startIndex) { }
     }
 
     internal class IndirectObjectBeginToken : Token
     {
         public override string Type => "obj";
-        public IndirectObjectBeginToken() : base("obj") { }
+        public IndirectObjectBeginToken(int startIndex) : base("obj", startIndex) { }
     }
 
     internal class IndirectObjectEndToken : Token
     {
         public override string Type => "endobj";
-        public IndirectObjectEndToken() : base("endobj") { }
+        public IndirectObjectEndToken(int startIndex) : base("endobj", startIndex) { }
     }
 
     internal class StreamBeginToken : Token
     {
         public override string Type => "stream";
-        public StreamBeginToken() : base("stream") { }
+        public StreamBeginToken(int startIndex) : base("stream", startIndex) { }
     }
 
     internal class StreamEndToken : Token
     {
         public override string Type => "endstream";
-        public StreamEndToken() : base("endstream") { }
+        public StreamEndToken(int startIndex) : base("endstream", startIndex) { }
     }
 
     internal class NullToken : Token
     {
         public override string Type => "null";
-        public NullToken() : base("null") { }
+        public NullToken(int startIndex) : base("null", startIndex) { }
         public override string ToString()
         {
             return "null";
@@ -82,7 +88,7 @@ namespace MetadataExtractor.Formats.Pdf
 
         public override string Type => "boolean";
 
-        public BooleanToken(bool value) : base(value ? "true" : "false")
+        public BooleanToken(bool value, int startIndex) : base(value ? "true" : "false", startIndex)
         {
             BooleanValue = value;
         }
@@ -99,8 +105,8 @@ namespace MetadataExtractor.Formats.Pdf
 
         public override string Type => "numeric-integer";
 
-        public NumericIntegerToken(int value, byte[] rawValue)
-            : base(rawValue)
+        public NumericIntegerToken(int value, byte[] rawValue, int startIndex)
+            : base(rawValue, startIndex)
         {
             IntegerValue = value;
         }
@@ -116,8 +122,8 @@ namespace MetadataExtractor.Formats.Pdf
 
         public override string Type => "numeric-real";
 
-        public NumericRealToken(decimal value, byte[] rawValue)
-            : base(rawValue)
+        public NumericRealToken(decimal value, byte[] rawValue, int startIndex)
+            : base(rawValue, startIndex)
         {
             RealValue = value;
         }
@@ -130,25 +136,25 @@ namespace MetadataExtractor.Formats.Pdf
     internal class ArrayBeginToken : Token
     {
         public override string Type => "array-begin";
-        public ArrayBeginToken() : base("[") { }
+        public ArrayBeginToken(int startIndex) : base("[", startIndex) { }
     }
 
     internal class ArrayEndToken : Token
     {
         public override string Type => "array-end";
-        public ArrayEndToken() : base("]") { }
+        public ArrayEndToken(int startIndex) : base("]", startIndex) { }
     }
 
     internal class DictionaryBeginToken : Token
     {
         public override string Type => "dictionary-begin";
-        public DictionaryBeginToken() : base("<<") { }
+        public DictionaryBeginToken(int startIndex) : base("<<", startIndex) { }
     }
 
     internal class DictionaryEndToken : Token
     {
         public override string Type => "dictionary-end";
-        public DictionaryEndToken() : base(">>") { }
+        public DictionaryEndToken(int startIndex) : base(">>", startIndex) { }
     }
 
     public class StringToken : Token
@@ -157,8 +163,8 @@ namespace MetadataExtractor.Formats.Pdf
 
         public StringValue StringValue => new StringValue(Value); // TODO encoding is context-specific
 
-        public StringToken(byte[] value)
-            : base(value)
+        public StringToken(byte[] value, int startIndex)
+            : base(value, startIndex)
         {
 
         }
@@ -185,8 +191,8 @@ namespace MetadataExtractor.Formats.Pdf
 
         public StringValue StringValue => new StringValue(Value, Encoding.UTF8);
 
-        public NameToken(byte[] value)
-            : base(value)
+        public NameToken(byte[] value, int startIndex)
+            : base(value, startIndex)
         {
             // the value does not include the leading slash (/)
         }
@@ -203,8 +209,8 @@ namespace MetadataExtractor.Formats.Pdf
     {
         public override string Type => "comment";
 
-        public CommentToken(byte[] value)
-            : base(value)
+        public CommentToken(byte[] value, int startIndex)
+            : base(value, startIndex)
         {
             // the value does not include the leading slash (/)
         }
