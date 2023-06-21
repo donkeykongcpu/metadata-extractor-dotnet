@@ -68,7 +68,7 @@ namespace MetadataExtractor.Formats.Pdf
 
             if (delta >= _buffer.Length)
             {
-                throw new ArgumentOutOfRangeException(nameof(delta), "Cannot peek that far ahead");
+                throw new ArgumentOutOfRangeException(nameof(delta), $"Cannot peek that far ahead (max is {_buffer.Length - 1} items)");
             }
 
             if (!IsItemAvailableInBuffer(delta))
@@ -157,8 +157,8 @@ namespace MetadataExtractor.Formats.Pdf
 
     internal enum ExtractionDirection
     {
-        Forward,
-        Backward,
+        Forward = 1,
+        Backward = -1,
     }
 
     internal abstract class ByteStreamBufferedProvider : BufferedProvider<byte>
@@ -167,22 +167,27 @@ namespace MetadataExtractor.Formats.Pdf
 
         private readonly long _availableLength;
 
+        private readonly int _startOffset;
+
         private int _index; // the index of the next byte to be returned (can go above _availableLength when extracting forward, or below zero when extracting backward, indicating the end of input)
 
-        private int _bytesRead;
+        private int _bytesRead; // TODO remove this
 
-        public bool HasNextItem => ItemsConsumed < _availableLength;
+        public bool HasNextItem => _extractionDirection == ExtractionDirection.Forward
+            ? _startOffset + ItemsConsumed < _availableLength
+            : _startOffset - ItemsConsumed >= 0
+        ;
 
-        public int BytesRead => _bytesRead;
+        public int CurrentIndex => _startOffset + ItemsConsumed * (int)_extractionDirection; // NOTE CurrentIndex is undefined when !HasNextItem
 
-        protected ByteStreamBufferedProvider(long availableLength, int startIndex, int bufferLength, ExtractionDirection extractionDirection)
+        protected ByteStreamBufferedProvider(long availableLength, int startOffset, int bufferLength, ExtractionDirection extractionDirection)
             : base(bufferLength)
         {
             _extractionDirection = extractionDirection;
 
             _availableLength = availableLength;
 
-            _index = _extractionDirection == ExtractionDirection.Forward ? startIndex : (int)availableLength - 1;
+            _index = _startOffset = _extractionDirection == ExtractionDirection.Forward ? startOffset : (int)availableLength - startOffset - 1; // TODO account for startIndex when going backward
         }
 
         sealed protected override byte[] GetNextItemsFromSource(int count)
