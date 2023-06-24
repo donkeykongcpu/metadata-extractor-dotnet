@@ -20,11 +20,14 @@ namespace MetadataExtractor.Formats.Pdf
                 int currentIndex = _byteProvider.CurrentIndex;
 
                 if (MatchWhitespace()) continue;
+                else if (MatchToken("stream"))
+                {
+                    yield return new StreamBeginToken(currentIndex);
+                    yield break; // do not tokenise further, since the stream most likely contains invalid tokens
+                }
                 else if (MatchToken("R")) yield return new IndirectReferenceMarkerToken(currentIndex);
                 else if (MatchToken("obj")) yield return new IndirectObjectBeginToken(currentIndex);
                 else if (MatchToken("endobj")) yield return new IndirectObjectEndToken(currentIndex);
-                else if (MatchToken("stream")) yield return new StreamBeginToken(currentIndex);
-                else if (MatchToken("endstream")) yield return new StreamEndToken(currentIndex);
                 else if (MatchToken("null")) yield return new NullToken(currentIndex);
                 else if (MatchToken("true")) yield return new BooleanToken(true, currentIndex);
                 else if (MatchToken("false")) yield return new BooleanToken(false, currentIndex);

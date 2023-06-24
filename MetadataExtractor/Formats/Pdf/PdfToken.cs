@@ -66,12 +66,6 @@ namespace MetadataExtractor.Formats.Pdf
         public StreamBeginToken(int startIndex) : base("stream", startIndex) { }
     }
 
-    internal class StreamEndToken : Token
-    {
-        public override string Type => "endstream";
-        public StreamEndToken(int startIndex) : base("endstream", startIndex) { }
-    }
-
     internal class NullToken : Token
     {
         public override string Type => "null";
