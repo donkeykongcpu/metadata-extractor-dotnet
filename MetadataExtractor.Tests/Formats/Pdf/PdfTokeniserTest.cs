@@ -138,6 +138,8 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
                 Token[] expected = _testLiteralStrings[input];
 
+                Assert.Equal(expected.Length, actual.Length);
+
                 for (int i = 0; i < actual.Length; i++)
                 {
                     Assert.Equal(expected[i], actual[i]);
@@ -155,6 +157,8 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                 Token[] actual = GetTokeniserForInput(input).Tokenise().ToArray();
 
                 Token[] expected = _testHexadecimalStrings[input];
+
+                Assert.Equal(expected.Length, actual.Length);
 
                 for (int i = 0; i < actual.Length; i++)
                 {
@@ -174,6 +178,8 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
                 Token[] expected = _testNames[input];
 
+                Assert.Equal(expected.Length, actual.Length);
+
                 for (int i = 0; i < actual.Length; i++)
                 {
                     Assert.Equal(expected[i], actual[i]);
@@ -191,6 +197,8 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                 Token[] actual = GetTokeniserForInput(input).Tokenise().ToArray();
 
                 Token[] expected = _testComments[input];
+
+                Assert.Equal(expected.Length, actual.Length);
 
                 for (int i = 0; i < actual.Length; i++)
                 {
@@ -304,5 +312,40 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             Assert.Equal(28, realTokens[5].StartIndex);
         }
 
+        [Fact]
+        public void TestTokenDelimiters()
+        {
+            string input = " <</Key1 [1 2]/Key2 1 2 R/Key3 <abcd>>>";
+            //              01234567890123456789012345678901234567
+            //              0         10        20        30
+
+            Token[] actual = GetTokeniserForInput(input).Tokenise().ToArray();
+
+            Token[] expected =
+            {
+                new DictionaryBeginToken(1),
+                CreateNameToken("Key1", 3),
+                new ArrayBeginToken(9),
+                new NumericIntegerToken(1, new byte[] { (byte)'1' }, 10),
+                new NumericIntegerToken(2, new byte[] { (byte)'2' }, 12),
+                new ArrayEndToken(13),
+                CreateNameToken("Key2", 14),
+                new NumericIntegerToken(1, new byte[] { (byte)'1' }, 20),
+                new NumericIntegerToken(2, new byte[] { (byte)'2' }, 22),
+                new IndirectReferenceMarkerToken(24),
+                CreateNameToken("Key3", 25),
+                CreateStringToken("\u00AB\u00CD", 31),
+                new DictionaryEndToken(37),
+            };
+
+            Assert.Equal(expected.Length, actual.Length);
+
+            for (int i = 0; i < actual.Length; i++)
+            {
+                Assert.Equal(expected[i], actual[i]);
+
+                Assert.Equal(expected[i].StartIndex, actual[i].StartIndex);
+            }
+        }
     }
 }

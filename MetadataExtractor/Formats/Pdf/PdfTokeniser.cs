@@ -45,8 +45,9 @@ namespace MetadataExtractor.Formats.Pdf
         {
             byte[] tokenBytes = Encoding.ASCII.GetBytes(asciiToken);
             byte byteAfterLast = _byteProvider.PeekNextItem(tokenBytes.Length);
-            // must be followed by whitespace (or EOF), array end marker, or dictionary end marker
-            if (!PdfReader.WhitespaceChars.Contains(byteAfterLast) && byteAfterLast != (byte)']' && byteAfterLast != (byte)'>')
+            // must be followed by whitespace (or EOF), array end marker, dictionary end marker or name marker
+            if (!PdfReader.WhitespaceChars.Contains(byteAfterLast)
+                && byteAfterLast != (byte)']' && byteAfterLast != (byte)'>' && byteAfterLast != (byte)'/')
             {
                 return false;
             }
