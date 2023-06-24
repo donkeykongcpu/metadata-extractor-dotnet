@@ -371,7 +371,7 @@ namespace MetadataExtractor.Formats.Pdf
             _byteProvider.Consume(1);
             while (true)
             {
-                if (!_byteProvider.HasNextItem || MatchWhitespace())
+                if (!_byteProvider.HasNextItem || MatchWhitespace() || _byteProvider.PeekNextItem(0) == (byte)'/')
                 {
                     token = new NameToken(bytes.ToArray(), currentIndex); // does not include the leading slash (/)
                     return true; // success!
