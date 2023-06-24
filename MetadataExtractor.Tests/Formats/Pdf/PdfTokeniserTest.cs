@@ -26,6 +26,11 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             return new CommentToken(value.ToCharArray().Select(c => (byte)c).ToArray(), startIndex);
         }
 
+        private static NumericIntegerToken CreateNumericIntegerToken(int value, int startIndex)
+        {
+            return new NumericIntegerToken(value, value.ToString().ToCharArray().Select(c => (byte)c).ToArray(), startIndex);
+        }
+
         private static Dictionary<string, StringToken[]> _testLiteralStrings = new Dictionary<string, StringToken[]>
         {
             { "(This is a string)", new StringToken[] { CreateStringToken("This is a string", 0) } },
@@ -326,12 +331,12 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                 new DictionaryBeginToken(1),
                 CreateNameToken("Key1", 3),
                 new ArrayBeginToken(9),
-                new NumericIntegerToken(1, new byte[] { (byte)'1' }, 10),
-                new NumericIntegerToken(2, new byte[] { (byte)'2' }, 12),
+                CreateNumericIntegerToken(1, 10),
+                CreateNumericIntegerToken(2, 12),
                 new ArrayEndToken(13),
                 CreateNameToken("Key2", 14),
-                new NumericIntegerToken(1, new byte[] { (byte)'1' }, 20),
-                new NumericIntegerToken(2, new byte[] { (byte)'2' }, 22),
+                CreateNumericIntegerToken(1, 20),
+                CreateNumericIntegerToken(2, 22),
                 new IndirectReferenceMarkerToken(24),
                 CreateNameToken("Key3", 25),
                 CreateStringToken("\u00AB\u00CD", 31),
@@ -361,7 +366,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             {
                 new DictionaryBeginToken(1),
                 CreateNameToken("Length", 3),
-                new NumericIntegerToken(42, new byte[] { (byte)'4', (byte)'2' }, 11),
+                CreateNumericIntegerToken(42, 11),
                 new DictionaryEndToken(13),
                 new StreamBeginToken(15),
             };
@@ -392,10 +397,61 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                 CreateNameToken("SomeName", 8),
                 CreateNameToken("SomeKey", 17),
                 new ArrayBeginToken(26),
-                new NumericIntegerToken(1, new byte[] { (byte)'1' }, 27),
-                new NumericIntegerToken(2, new byte[] { (byte)'2' }, 29),
+                CreateNumericIntegerToken(1, 27),
+                CreateNumericIntegerToken(2, 29),
                 new ArrayEndToken(30),
                 new DictionaryEndToken(31),
+            };
+
+            Assert.Equal(expected.Length, actual.Length);
+
+            for (int i = 0; i < actual.Length; i++)
+            {
+                Assert.Equal(expected[i], actual[i]);
+
+                Assert.Equal(expected[i].StartIndex, actual[i].StartIndex);
+            }
+        }
+
+        [Fact]
+        public void TestDictionaryFromSampleFile()
+        {
+            string input = " 699 0 obj\r\n<</First 700 0 R/Count 13/Last 701 0 R>>\r\nendobj\r\n1129 0 obj\r\n<</Subtype/XML/Length 3649/Type/Metadata>>stream";
+            //              01234567890 1 23456789012345678901234567890123456789012 3 4567890 1 23456789012 3 4567890123456789012345678901234567890123456
+            //              0         10          20        30        40        50          60          70          80        90        100       110
+
+            Token[] actual = GetTokeniserForInput(input).Tokenise().ToArray();
+
+            Token[] expected =
+            {
+                CreateNumericIntegerToken(699, 1),
+                CreateNumericIntegerToken(0, 5),
+                new IndirectObjectBeginToken(7),
+                new DictionaryBeginToken(12),
+                CreateNameToken("First", 14),
+                CreateNumericIntegerToken(700, 21),
+                CreateNumericIntegerToken(0, 25),
+                new IndirectReferenceMarkerToken(27),
+                CreateNameToken("Count", 28),
+                CreateNumericIntegerToken(13, 35),
+                CreateNameToken("Last", 37),
+                CreateNumericIntegerToken(701, 43),
+                CreateNumericIntegerToken(0, 47),
+                new IndirectReferenceMarkerToken(49),
+                new DictionaryEndToken(50),
+                new IndirectObjectEndToken(54),
+                CreateNumericIntegerToken(1129, 62),
+                CreateNumericIntegerToken(0, 67),
+                new IndirectObjectBeginToken(69),
+                new DictionaryBeginToken(74),
+                CreateNameToken("Subtype", 76),
+                CreateNameToken("XML", 84),
+                CreateNameToken("Length", 88),
+                CreateNumericIntegerToken(3649, 96),
+                CreateNameToken("Type", 100),
+                CreateNameToken("Metadata", 105),
+                new DictionaryEndToken(114),
+                new StreamBeginToken(116),
             };
 
             Assert.Equal(expected.Length, actual.Length);
