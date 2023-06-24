@@ -464,5 +464,57 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             }
         }
 
+        [Fact]
+        public void TestDelimitersFromSampleFile()
+        {
+            string input = " <</Outlines 699 0 R/OCProperties<</D<</RBGroups[]/OFF[]/Order[[(35%_ATM_5-26-09.pdf)1134 0 R[1135 0 R]>>>>";
+            //              0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345
+            //              0         10        20        30        40        50        60        70        80        90        100
+
+            Token[] actual = GetTokeniserForInput(input).Tokenise().ToArray();
+
+            Token[] expected =
+            {
+                new DictionaryBeginToken(1),
+                CreateNameToken("Outlines", 3),
+                CreateNumericIntegerToken(699, 13),
+                CreateNumericIntegerToken(0, 17),
+                new IndirectReferenceMarkerToken(19),
+                CreateNameToken("OCProperties", 20),
+                new DictionaryBeginToken(33),
+                CreateNameToken("D", 35),
+                new DictionaryBeginToken(37),
+                CreateNameToken("RBGroups", 39),
+                new ArrayBeginToken(48),
+                new ArrayEndToken(49),
+                CreateNameToken("OFF", 50),
+                new ArrayBeginToken(54),
+                new ArrayEndToken(55),
+                CreateNameToken("Order", 56),
+                new ArrayBeginToken(62),
+                new ArrayBeginToken(63),
+                CreateStringToken("35%_ATM_5-26-09.pdf", 64),
+                CreateNumericIntegerToken(1134, 85),
+                CreateNumericIntegerToken(0, 90),
+                new IndirectReferenceMarkerToken(92),
+                new ArrayBeginToken(93),
+                CreateNumericIntegerToken(1135, 94),
+                CreateNumericIntegerToken(0, 99),
+                new IndirectReferenceMarkerToken(101),
+                new ArrayEndToken(102),
+                new DictionaryEndToken(103),
+                new DictionaryEndToken(105),
+            };
+
+            Assert.Equal(expected.Length, actual.Length);
+
+            for (int i = 0; i < actual.Length; i++)
+            {
+                Assert.Equal(expected[i], actual[i]);
+
+                Assert.Equal(expected[i].StartIndex, actual[i].StartIndex);
+            }
+        }
+
     }
 }

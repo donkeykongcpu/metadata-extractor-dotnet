@@ -48,9 +48,10 @@ namespace MetadataExtractor.Formats.Pdf
         {
             byte[] tokenBytes = Encoding.ASCII.GetBytes(asciiToken);
             byte byteAfterLast = _byteProvider.PeekNextItem(tokenBytes.Length);
-            // must be followed by whitespace (or EOF), array end marker, dictionary end marker or name marker
+            // must be followed by whitespace (or EOF), array marker, dictionary end marker or name marker
             if (!PdfReader.WhitespaceChars.Contains(byteAfterLast)
-                && byteAfterLast != (byte)']' && byteAfterLast != (byte)'>' && byteAfterLast != (byte)'/')
+                && byteAfterLast != (byte)'[' && byteAfterLast != (byte)']'
+                && byteAfterLast != (byte)'>' && byteAfterLast != (byte)'/')
             {
                 return false;
             }
@@ -372,7 +373,10 @@ namespace MetadataExtractor.Formats.Pdf
             while (true)
             {
                 if (!_byteProvider.HasNextItem || MatchWhitespace()
-                    || _byteProvider.PeekNextItem(0) == (byte)'/' || _byteProvider.PeekNextItem(0) == (byte)'>')
+                    || _byteProvider.PeekNextItem(0) == (byte)'/'
+                    || _byteProvider.PeekNextItem(0) == (byte)'<' || _byteProvider.PeekNextItem(0) == (byte)'>'
+                    || _byteProvider.PeekNextItem(0) == (byte)'[' || _byteProvider.PeekNextItem(0) == (byte)']'
+                    )
                 {
                     token = new NameToken(bytes.ToArray(), currentIndex); // does not include the leading slash (/)
                     return true; // success!
