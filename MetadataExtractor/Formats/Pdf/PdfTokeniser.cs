@@ -6,6 +6,8 @@ namespace MetadataExtractor.Formats.Pdf
 {
     internal class PdfTokeniser
     {
+        private static byte[] HeaderCommentBytes { get; } = Encoding.ASCII.GetBytes("PDF-");
+
         private readonly ByteStreamBufferedProvider _byteProvider;
 
         public PdfTokeniser(ByteStreamBufferedProvider byteProvider)
@@ -51,7 +53,9 @@ namespace MetadataExtractor.Formats.Pdf
             // must be followed by whitespace (or EOF), array marker, dictionary end marker or name marker
             if (!PdfReader.WhitespaceChars.Contains(byteAfterLast)
                 && byteAfterLast != (byte)'[' && byteAfterLast != (byte)']'
-                && byteAfterLast != (byte)'>' && byteAfterLast != (byte)'/')
+                && byteAfterLast != (byte)'<' && byteAfterLast != (byte)'>'
+                && byteAfterLast != (byte)'/'
+                )
             {
                 return false;
             }

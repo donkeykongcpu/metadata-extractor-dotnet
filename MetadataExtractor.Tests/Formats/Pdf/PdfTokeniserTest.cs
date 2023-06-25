@@ -26,6 +26,12 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             return new CommentToken(value.ToCharArray().Select(c => (byte)c).ToArray(), startIndex);
         }
 
+        private static HeaderCommentToken CreateHeaderCommentToken(string value, string version, int startIndex)
+        {
+            // NOTE: value should only contain 1-byte characters
+            return new HeaderCommentToken(value.ToCharArray().Select(c => (byte)c).ToArray(), version, startIndex);
+        }
+
         private static NumericIntegerToken CreateNumericIntegerToken(int value, int startIndex)
         {
             return new NumericIntegerToken(value, value.ToString().ToCharArray().Select(c => (byte)c).ToArray(), startIndex);
@@ -160,7 +166,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
                 for (int i = 0; i < actual.Length; i++)
                 {
-                    Assert.Equal(expected[i], actual[i]);
+                    Assert.True(expected[i].Equals(actual[i]));
 
                     Assert.Equal(expected[i].StartIndex, actual[i].StartIndex);
                 }
@@ -180,7 +186,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
                 for (int i = 0; i < actual.Length; i++)
                 {
-                    Assert.Equal(expected[i], actual[i]);
+                    Assert.True(expected[i].Equals(actual[i]));
 
                     Assert.Equal(expected[i].StartIndex, actual[i].StartIndex);
                 }
@@ -200,7 +206,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
                 for (int i = 0; i < actual.Length; i++)
                 {
-                    Assert.Equal(expected[i], actual[i]);
+                    Assert.True(expected[i].Equals(actual[i]));
 
                     Assert.Equal(expected[i].StartIndex, actual[i].StartIndex);
                 }
@@ -220,7 +226,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
                 for (int i = 0; i < actual.Length; i++)
                 {
-                    Assert.Equal(expected[i], actual[i]);
+                    Assert.True(expected[i].Equals(actual[i]));
 
                     Assert.Equal(expected[i].StartIndex, actual[i].StartIndex);
                 }
@@ -404,7 +410,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             for (int i = 0; i < actual.Length; i++)
             {
-                Assert.Equal(expected[i], actual[i]);
+                Assert.True(expected[i].Equals(actual[i]));
 
                 Assert.Equal(expected[i].StartIndex, actual[i].StartIndex);
             }
@@ -432,7 +438,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             for (int i = 0; i < actual.Length; i++)
             {
-                Assert.Equal(expected[i], actual[i]);
+                Assert.True(expected[i].Equals(actual[i]));
 
                 Assert.Equal(expected[i].StartIndex, actual[i].StartIndex);
             }
@@ -464,7 +470,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             for (int i = 0; i < actual.Length; i++)
             {
-                Assert.Equal(expected[i], actual[i]);
+                Assert.True(expected[i].Equals(actual[i]));
 
                 Assert.Equal(expected[i].StartIndex, actual[i].StartIndex);
             }
@@ -473,9 +479,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
         [Fact]
         public void TestDictionaryFromSampleFile()
         {
-            string input = " 699 0 obj\r\n<</First 700 0 R/Count 13/Last 701 0 R>>\r\nendobj\r\n1129 0 obj\r\n<</Subtype/XML/Length 3649/Type/Metadata>>stream";
-            //              01234567890 1 23456789012345678901234567890123456789012 3 4567890 1 23456789012 3 4567890123456789012345678901234567890123456
-            //              0         10          20        30        40        50          60          70          80        90        100       110
+            string input = " 699 0 obj<</First 700 0 R/Count 13/Last 701 0 R>>endobj\r\n1129 0 obj\r\n<</Subtype/XML/Length 3649/Type/Metadata>>stream";
+            //              012345678901234567890123456789012345678901234567890123456 7 89012345678 9 01234567890123456789012345678901234567890123456
+            //              0         10        20        30        40        50          60          70        80        90        100       110
 
             Token[] actual = GetTokeniserForInput(input).Tokenise().ToArray();
 
@@ -484,38 +490,38 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                 CreateNumericIntegerToken(699, 1),
                 CreateNumericIntegerToken(0, 5),
                 new IndirectObjectBeginToken(7),
-                new DictionaryBeginToken(12),
-                CreateNameToken("First", 14),
-                CreateNumericIntegerToken(700, 21),
-                CreateNumericIntegerToken(0, 25),
-                new IndirectReferenceMarkerToken(27),
-                CreateNameToken("Count", 28),
-                CreateNumericIntegerToken(13, 35),
-                CreateNameToken("Last", 37),
-                CreateNumericIntegerToken(701, 43),
-                CreateNumericIntegerToken(0, 47),
-                new IndirectReferenceMarkerToken(49),
-                new DictionaryEndToken(50),
-                new IndirectObjectEndToken(54),
-                CreateNumericIntegerToken(1129, 62),
-                CreateNumericIntegerToken(0, 67),
-                new IndirectObjectBeginToken(69),
-                new DictionaryBeginToken(74),
-                CreateNameToken("Subtype", 76),
-                CreateNameToken("XML", 84),
-                CreateNameToken("Length", 88),
-                CreateNumericIntegerToken(3649, 96),
-                CreateNameToken("Type", 100),
-                CreateNameToken("Metadata", 105),
-                new DictionaryEndToken(114),
-                new StreamBeginToken(116),
+                new DictionaryBeginToken(10),
+                CreateNameToken("First", 12),
+                CreateNumericIntegerToken(700, 19),
+                CreateNumericIntegerToken(0, 23),
+                new IndirectReferenceMarkerToken(25),
+                CreateNameToken("Count", 26),
+                CreateNumericIntegerToken(13, 33),
+                CreateNameToken("Last", 35),
+                CreateNumericIntegerToken(701, 41),
+                CreateNumericIntegerToken(0, 45),
+                new IndirectReferenceMarkerToken(47),
+                new DictionaryEndToken(48),
+                new IndirectObjectEndToken(50),
+                CreateNumericIntegerToken(1129, 58),
+                CreateNumericIntegerToken(0, 63),
+                new IndirectObjectBeginToken(65),
+                new DictionaryBeginToken(70),
+                CreateNameToken("Subtype", 72),
+                CreateNameToken("XML", 80),
+                CreateNameToken("Length", 84),
+                CreateNumericIntegerToken(3649, 92),
+                CreateNameToken("Type", 96),
+                CreateNameToken("Metadata", 101),
+                new DictionaryEndToken(110),
+                new StreamBeginToken(112),
             };
 
             Assert.Equal(expected.Length, actual.Length);
 
             for (int i = 0; i < actual.Length; i++)
             {
-                Assert.Equal(expected[i], actual[i]);
+                Assert.True(expected[i].Equals(actual[i]));
 
                 Assert.Equal(expected[i].StartIndex, actual[i].StartIndex);
             }
@@ -567,7 +573,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             for (int i = 0; i < actual.Length; i++)
             {
-                Assert.Equal(expected[i], actual[i]);
+                Assert.True(expected[i].Equals(actual[i]));
 
                 Assert.Equal(expected[i].StartIndex, actual[i].StartIndex);
             }
