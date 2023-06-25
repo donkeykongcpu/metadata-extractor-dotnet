@@ -221,11 +221,14 @@ namespace MetadataExtractor.Formats.Pdf
 
         public string Version { get; }
 
+        public decimal DecimalVersion { get; }
+
         public HeaderCommentToken(byte[] value, string version, int startIndex)
             : base(value, startIndex)
         {
             // the value does not include the leading percent sign (%)
             Version = version;
+            DecimalVersion = decimal.Parse(version);
         }
     }
 

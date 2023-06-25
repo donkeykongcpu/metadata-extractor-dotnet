@@ -255,6 +255,8 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                     Assert.Equal(expected[i].StartIndex, headerTokens[i].StartIndex);
 
                     Assert.Equal(expected[i].Version, headerTokens[i].Version);
+
+                    Assert.Equal(expected[i].DecimalVersion, headerTokens[i].DecimalVersion);
                 }
             }
         }
