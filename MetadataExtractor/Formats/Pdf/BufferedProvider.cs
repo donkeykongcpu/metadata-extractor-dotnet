@@ -4,48 +4,25 @@ using System;
 
 namespace MetadataExtractor.Formats.Pdf
 {
-    internal abstract class BufferedProvider<ItemType>
+    public abstract class ItemProvider<ItemType>
     {
-        private readonly ItemType[] _buffer;
-
-        private int _start; // the index of the first item in the circular buffer
-
-        private int _end; // the index of the last item in the circular buffer
-
-        private int _count; // the number of items that are available in the circular buffer (in case _start == _end, the circular buffer can be completely empty or completely full)
-
         private int _itemsConsumed;
-
-        public int BufferLength => _buffer.Length;
 
         public int ItemsConsumed => _itemsConsumed;
 
-        protected BufferedProvider(int bufferLength)
+        protected ItemProvider()
         {
-            _buffer = new ItemType[bufferLength];
-
-            _start = _end = _count = _itemsConsumed = 0;
+            _itemsConsumed = 0;
         }
 
         public ItemType GetNextItem()
         {
-            if (!IsItemAvailableInBuffer(0))
-            {
-                FillBuffer();
-            }
-
-            Debug.Assert(IsItemAvailableInBuffer(0));
-
-            ItemType result = _buffer[_start];
-
-            _start = (_start + 1) % _buffer.Length;
-
-            _count--;
-
             _itemsConsumed++;
 
-            return result;
+            return DoGetNextItem();
         }
+
+        protected abstract ItemType DoGetNextItem();
 
         public ItemType[] GetNextItems(int count)
         {
@@ -66,6 +43,60 @@ namespace MetadataExtractor.Formats.Pdf
                 throw new ArgumentOutOfRangeException(nameof(delta), "Cannot peek previous items");
             }
 
+            return DoPeekNextItem(delta);
+        }
+
+        protected abstract ItemType DoPeekNextItem(int delta);
+
+        public void Consume(int count)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                GetNextItem();
+            }
+        }
+    }
+
+    public abstract class BufferedItemProvider<ItemType> : ItemProvider<ItemType>
+    {
+        private readonly ItemType[] _buffer;
+
+        private int _start; // the index of the first item in the circular buffer
+
+        private int _end; // the index of the last item in the circular buffer
+
+        private int _count; // the number of items that are available in the circular buffer (in case _start == _end, the circular buffer can be completely empty or completely full)
+
+        public int BufferLength => _buffer.Length;
+    
+        protected BufferedItemProvider(int bufferLength)
+            : base()
+        {
+            _buffer = new ItemType[bufferLength];
+
+            _start = _end = _count = 0;
+        }
+
+        protected override ItemType DoGetNextItem()
+        {
+            if (!IsItemAvailableInBuffer(0))
+            {
+                FillBuffer();
+            }
+
+            Debug.Assert(IsItemAvailableInBuffer(0));
+
+            ItemType result = _buffer[_start];
+
+            _start = (_start + 1) % _buffer.Length;
+
+            _count--;
+
+            return result;
+        }
+
+        protected override ItemType DoPeekNextItem(int delta)
+        {
             if (delta >= _buffer.Length)
             {
                 throw new ArgumentOutOfRangeException(nameof(delta), $"Cannot peek that far ahead (max is {_buffer.Length - 1} items)");
@@ -79,14 +110,6 @@ namespace MetadataExtractor.Formats.Pdf
             Debug.Assert(IsItemAvailableInBuffer(delta));
 
             return _buffer[(_start + delta) % _buffer.Length];
-        }
-
-        public void Consume(int count)
-        {
-            for (int i = 0; i < count; i++)
-            {
-                GetNextItem();
-            }
         }
 
         private bool IsItemAvailableInBuffer(int delta)
@@ -115,7 +138,7 @@ namespace MetadataExtractor.Formats.Pdf
         protected abstract ItemType[] GetNextItemsFromSource(int count);
     }
 
-    internal class EnumeratedBufferedProvider<ItemType, DummyItemType> : BufferedProvider<ItemType> where DummyItemType : ItemType
+    public class EnumeratedBufferedProvider<ItemType, DummyItemType> : BufferedItemProvider<ItemType> where DummyItemType : ItemType
     {
         private readonly IEnumerator<ItemType> _enumerator;
 
@@ -155,13 +178,13 @@ namespace MetadataExtractor.Formats.Pdf
         //}
     }
 
-    internal enum ExtractionDirection
+    public enum ExtractionDirection
     {
         Forward = 1,
         Backward = -1,
     }
 
-    internal abstract class ByteStreamBufferedProvider : BufferedProvider<byte>
+    public abstract class ByteStreamBufferedProvider : BufferedItemProvider<byte>
     {
         private readonly ExtractionDirection _extractionDirection;
 
@@ -276,7 +299,7 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
-    internal class StringByteProvider : ByteStreamBufferedProvider
+    public class StringByteProvider : ByteStreamBufferedProvider
     {
         private readonly byte[] _input;
 
