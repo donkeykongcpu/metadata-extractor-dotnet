@@ -481,6 +481,42 @@ namespace MetadataExtractor.Tests.Formats.Pdf
         }
 
         [Fact]
+        public void TestConsecutiveArrayValuesNoSpacing()
+        {
+            string input = " <</Names[(DC)37 0 R(DO)38 0 R]>>";
+            //              01234567890123456789012345678901
+            //              0         10        20        30
+
+            Token[] actual = GetTokeniserForInput(input).Tokenise().ToArray();
+
+            Token[] expected =
+            {
+                new DictionaryBeginToken(1),
+                CreateNameToken("Names", 3),
+                new ArrayBeginToken(9),
+                CreateStringToken("DC", 10),
+                CreateNumericIntegerToken(37, 14),
+                CreateNumericIntegerToken(0, 17),
+                new IndirectReferenceMarkerToken(19),
+                CreateStringToken("DO", 20),
+                CreateNumericIntegerToken(38, 24),
+                CreateNumericIntegerToken(0, 27),
+                new IndirectReferenceMarkerToken(29),
+                new ArrayEndToken(30),
+                new DictionaryEndToken(31),
+            };
+
+            Assert.Equal(expected.Length, actual.Length);
+
+            for (int i = 0; i < actual.Length; i++)
+            {
+                Assert.True(expected[i].Equals(actual[i]));
+
+                Assert.Equal(expected[i].StartIndex, actual[i].StartIndex);
+            }
+        }
+
+        [Fact]
         public void TestDictionaryFromSampleFile()
         {
             string input = " 699 0 obj<</First 700 0 R/Count 13/Last 701 0 R>>endobj\r\n1129 0 obj\r\n<</Subtype/XML/Length 3649/Type/Metadata>>stream";

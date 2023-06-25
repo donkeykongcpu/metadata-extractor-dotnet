@@ -55,6 +55,7 @@ namespace MetadataExtractor.Formats.Pdf
                 && byteAfterLast != (byte)'[' && byteAfterLast != (byte)']'
                 && byteAfterLast != (byte)'<' && byteAfterLast != (byte)'>'
                 && byteAfterLast != (byte)'/'
+                && byteAfterLast != (byte)'('
                 )
             {
                 return false;
