@@ -123,6 +123,19 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             { " \r\n %comment\n", new CommentToken[] { CreateCommentToken("comment", 4) } },
         };
 
+        private static Dictionary<string, HeaderCommentToken[]> _testHeaderComments = new Dictionary<string, HeaderCommentToken[]>
+        {
+            { "%PDF-1.0", new HeaderCommentToken[] { CreateHeaderCommentToken("PDF-1.0", "1.0", 0) } },
+            { "%PDF-1.1 ", new HeaderCommentToken[] { CreateHeaderCommentToken("PDF-1.1 ", "1.1", 0) } },
+            { "%PDF-1.2\r\n", new HeaderCommentToken[] { CreateHeaderCommentToken("PDF-1.2", "1.2", 0) } },
+            { "%PDF-1.3\r", new HeaderCommentToken[] { CreateHeaderCommentToken("PDF-1.3", "1.3", 0) } },
+            { "%PDF-1.4\n", new HeaderCommentToken[] { CreateHeaderCommentToken("PDF-1.4", "1.4", 0) } },
+            { "%PDF-1.5 \n", new HeaderCommentToken[] { CreateHeaderCommentToken("PDF-1.5 ", "1.5", 0) } },
+            { "%PDF-1.6", new HeaderCommentToken[] { CreateHeaderCommentToken("PDF-1.6", "1.6", 0) } },
+            { "%PDF-1.7", new HeaderCommentToken[] { CreateHeaderCommentToken("PDF-1.7", "1.7", 0) } },
+            { "%PDF-2.0", new HeaderCommentToken[] { CreateHeaderCommentToken("PDF-2.0", "2.0", 0) } },
+        };
+
 
         private static PdfTokeniser GetTokeniserForInput(string input)
         {
@@ -212,6 +225,46 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                     Assert.Equal(expected[i].StartIndex, actual[i].StartIndex);
                 }
             }
+        }
+
+        [Fact]
+        public void TestHeaderComments()
+        {
+            foreach (string input in _testHeaderComments.Keys)
+            {
+                Token[] actual = GetTokeniserForInput(input).Tokenise().ToArray();
+
+                HeaderCommentToken[] expected = _testHeaderComments[input];
+
+                Assert.Equal(expected.Length, actual.Length);
+
+                Assert.True(actual.All(token => token is HeaderCommentToken));
+
+                var headerTokens = actual.Cast<HeaderCommentToken>().ToArray();
+
+                for (int i = 0; i < actual.Length; i++)
+                {
+                    Assert.True(expected[i].Equals(headerTokens[i]));
+
+                    Assert.Equal(expected[i].StartIndex, headerTokens[i].StartIndex);
+
+                    Assert.Equal(expected[i].Version, headerTokens[i].Version);
+                }
+            }
+        }
+
+        [Fact]
+        public void TestBinaryIndicatorComment()
+        {
+            string input = " %\u00E2\u00E3\u00CF\u00D3\r\n";
+
+            Token[] actual = GetTokeniserForInput(input).Tokenise().ToArray();
+
+            Assert.True(actual.Length == 1);
+
+            Assert.True(actual[0] is BinaryIndicatorCommentToken);
+
+            Assert.Equal(1, actual[0].StartIndex);
         }
 
         [Fact]

@@ -420,8 +420,30 @@ namespace MetadataExtractor.Formats.Pdf
             {
                 if (!_byteProvider.HasNextItem || MatchEndOfLine())
                 {
-                    token = new CommentToken(bytes.ToArray(), currentIndex); // does not include the leading percent sign (%)
-                    return true; // success!
+                    byte[] byteArray = bytes.ToArray();
+                    if (byteArray.Length >= HeaderCommentBytes.Length + 3 && byteArray.RegionEquals(0, HeaderCommentBytes.Length, HeaderCommentBytes))
+                    {
+                        // %PDF-1.N signifies a PDF File Header, where N is a digit between 0 and 7
+                        // %PDF-2.0 signifies a PDF File Header for version 2.0
+                        if (TryDecimalToInt(byteArray[HeaderCommentBytes.Length]) >= 0
+                            && byteArray[HeaderCommentBytes.Length + 1] == (byte)'.'
+                            && TryDecimalToInt(byteArray[HeaderCommentBytes.Length + 2]) >= 0
+                            )
+                        {
+                            token = new HeaderCommentToken(byteArray, Encoding.ASCII.GetString(byteArray.Skip(HeaderCommentBytes.Length).Take(3).ToArray()), currentIndex);
+                            return true; // success!
+                        }
+                    }
+                    else if (byteArray.Length >= 4 && byteArray.All(b => b > 127))
+                    {
+                        token = new BinaryIndicatorCommentToken(byteArray, currentIndex);
+                        return true; // success!
+                    }
+                    else
+                    {
+                        token = new CommentToken(bytes.ToArray(), currentIndex); // does not include the leading percent sign (%)
+                        return true; // success!
+                    }
                 }
                 else
                 {
@@ -430,5 +452,17 @@ namespace MetadataExtractor.Formats.Pdf
                 }
             }
         }
+
+        /// <summary>
+        /// Treats a byte as an ASCII character, and returns its numerical value in decimal.
+        /// If conversion is not possible, returns -1.
+        /// </summary>
+        private static int TryDecimalToInt(byte b)
+        {
+            if (b >= '0' && b <= '9')
+                return b - '0';
+            return -1;
+        }
+
     }
 }

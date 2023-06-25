@@ -206,12 +206,43 @@ namespace MetadataExtractor.Formats.Pdf
         public CommentToken(byte[] value, int startIndex)
             : base(value, startIndex)
         {
-            // the value does not include the leading slash (/)
+            // the value does not include the leading percent sign (%)
         }
 
         public override string ToString()
         {
             return Encoding.ASCII.GetString(Value); // only used for debugging
+        }
+    }
+
+    public class HeaderCommentToken : CommentToken
+    {
+        public override string Type => "header-comment";
+
+        public string Version { get; }
+
+        public HeaderCommentToken(byte[] value, string version, int startIndex)
+            : base(value, startIndex)
+        {
+            // the value does not include the leading percent sign (%)
+            Version = version;
+        }
+    }
+
+    public class BinaryIndicatorCommentToken : CommentToken
+    {
+        // from the spec:
+        // If a PDF file contains binary data, as most do (see 7.2, "Lexical Conventions"), the header line shall be
+        // immediately followed by a comment line containing at least four binary characters -- that is, characters whose
+        // codes are 128 or greater.This ensures proper behaviour of file transfer applications that inspect data near the
+        // beginning of a file to determine whether to treat the file's contents as text or as binary.
+
+        public override string Type => "binary-indicator-comment";
+
+        public BinaryIndicatorCommentToken(byte[] value, int startIndex)
+            : base(value, startIndex)
+        {
+            // the value does not include the leading percent sign (%)
         }
     }
 }
