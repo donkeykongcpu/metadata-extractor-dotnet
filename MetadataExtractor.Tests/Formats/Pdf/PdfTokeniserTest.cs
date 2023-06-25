@@ -449,9 +449,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
         [Fact]
         public void TestConsecutiveKeysNoSpacing()
         {
-            string input = " <</Type/SomeName/SomeKey [1 2]>>";
-            //              01234567890123456789012345678901234567
-            //              0         10        20        30
+            string input = " <</Type/SomeName/SomeKey [1 2]/AnotherKey(some string)>>";
+            //              01234567890123456789012345678901234567890123456789012345
+            //              0         10        20        30        40        50
 
             Token[] actual = GetTokeniserForInput(input).Tokenise().ToArray();
 
@@ -465,7 +465,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                 CreateNumericIntegerToken(1, 27),
                 CreateNumericIntegerToken(2, 29),
                 new ArrayEndToken(30),
-                new DictionaryEndToken(31),
+                CreateNameToken("AnotherKey", 31),
+                CreateStringToken("some string", 42),
+                new DictionaryEndToken(55),
             };
 
             Assert.Equal(expected.Length, actual.Length);

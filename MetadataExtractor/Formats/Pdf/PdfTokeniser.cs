@@ -378,6 +378,7 @@ namespace MetadataExtractor.Formats.Pdf
             {
                 if (!_byteProvider.HasNextItem || MatchWhitespace()
                     || _byteProvider.PeekNextItem(0) == (byte)'/'
+                    || _byteProvider.PeekNextItem(0) == (byte)'('
                     || _byteProvider.PeekNextItem(0) == (byte)'<' || _byteProvider.PeekNextItem(0) == (byte)'>'
                     || _byteProvider.PeekNextItem(0) == (byte)'[' || _byteProvider.PeekNextItem(0) == (byte)']'
                     )
