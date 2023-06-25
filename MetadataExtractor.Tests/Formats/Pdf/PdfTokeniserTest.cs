@@ -223,7 +223,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             Assert.True(actual.Length == 1);
 
-            Assert.Equal("null".ToCharArray().Select(x => (byte)x).ToArray(), actual[0].Value);
+            Assert.True(actual[0] is NullToken);
 
             Assert.Equal(1, actual[0].StartIndex);
         }
@@ -237,7 +237,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             Assert.True(actual.Length == 1);
 
-            Assert.Equal("true".ToCharArray().Select(x => (byte)x).ToArray(), actual[0].Value);
+            Assert.True(actual[0] is BooleanToken);
+
+            Assert.True((actual[0] as BooleanToken)!.BooleanValue);
 
             Assert.Equal(2, actual[0].StartIndex);
         }
@@ -251,7 +253,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             Assert.True(actual.Length == 1);
 
-            Assert.Equal("false".ToCharArray().Select(x => (byte)x).ToArray(), actual[0].Value);
+            Assert.True(actual[0] is BooleanToken);
+
+            Assert.False((actual[0] as BooleanToken)!.BooleanValue);
 
             Assert.Equal(4, actual[0].StartIndex);
         }
