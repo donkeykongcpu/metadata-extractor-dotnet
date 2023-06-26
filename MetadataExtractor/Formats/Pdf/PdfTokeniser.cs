@@ -8,9 +8,9 @@ namespace MetadataExtractor.Formats.Pdf
     {
         private static byte[] HeaderCommentBytes { get; } = Encoding.ASCII.GetBytes("PDF-");
 
-        private readonly ByteStreamBufferedProvider _byteProvider;
+        private readonly ItemProvider<byte> _byteProvider;
 
-        public PdfTokeniser(ByteStreamBufferedProvider byteProvider)
+        public PdfTokeniser(ItemProvider<byte> byteProvider)
         {
             _byteProvider = byteProvider;
         }
