@@ -12,44 +12,44 @@ namespace MetadataExtractor.Formats.Pdf
 
         public abstract object? GetValue();
 
-        public void Add(PdfObject value)
-        {
-            AddValue(value);
-        }
+        public abstract void Add(PdfObject pdfObject);
+    }
 
-        public void Add(Token token)
+    internal class PdfScalarValue : PdfObject
+    {
+        private readonly string _type;
+
+        private readonly object? _value;
+
+        public override string Type => _type;
+
+        public override bool HasValue => true;
+
+        public static PdfScalarValue FromToken(Token token)
         {
-            if (token is DummyToken)
+            if (token is NullToken)
             {
-                return;
-            }
-            else if (token is CommentToken)
-            {
-                return;
-            }
-            else if (token is NullToken)
-            {
-                AddValue(null);
+                return new PdfScalarValue("null", null);
             }
             else if (token is BooleanToken booleanToken)
             {
-                AddValue(booleanToken.BooleanValue);
+                return new PdfScalarValue("boolean", booleanToken.BooleanValue);
             }
             else if (token is NumericIntegerToken numericIntegerToken)
             {
-                AddValue(numericIntegerToken.IntegerValue);
+                return new PdfScalarValue("numeric-integer", numericIntegerToken.IntegerValue);
             }
             else if (token is NumericRealToken numericRealToken)
             {
-                AddValue(numericRealToken.RealValue);
+                return new PdfScalarValue("numeric-real", numericRealToken.RealValue);
             }
             else if (token is StringToken stringToken)
             {
-                AddValue(stringToken.StringValue); // TODO encoding is context-specific
+                return new PdfScalarValue("string", stringToken.StringValue); // TODO encoding is context-specific
             }
             else if (token is NameToken nameToken)
             {
-                AddValue(nameToken.StringValue);
+                return new PdfScalarValue("name", nameToken.StringValue);
             }
             else
             {
@@ -57,7 +57,34 @@ namespace MetadataExtractor.Formats.Pdf
             }
         }
 
-        protected abstract void AddValue(object? value);
+        private PdfScalarValue(string type, object? value)
+        {
+            _type = type;
+
+            _value = value;
+        }
+
+        public override object? GetValue() => _value;
+
+        public override string ToString()
+        {
+            if (Type == "name")
+            {
+                // names are not usually intended to be printed,
+                // but when they are, their encoding is supposed to be UTF8
+                if (_value is null)
+                {
+                    throw new Exception("Value cannot be null");
+                }
+                return ((StringValue)_value).ToString(Encoding.UTF8);
+            }
+            return base.ToString();
+        }
+
+        public override void Add(PdfObject pdfObject)
+        {
+            throw new Exception("Cannot nest scalar values");
+        }
     }
 
     internal class PdfRoot : PdfObject
@@ -84,9 +111,13 @@ namespace MetadataExtractor.Formats.Pdf
             return _value;
         }
 
-        protected override void AddValue(object? value)
+        public override void Add(PdfObject pdfObject)
         {
-            _value = value;
+            if (_valueWasSet)
+            {
+                throw new Exception("Value already set");
+            }
+            _value = pdfObject;
             _valueWasSet = true;
         }
     }
@@ -137,9 +168,9 @@ namespace MetadataExtractor.Formats.Pdf
             return $"{ObjectNumber}-{Generation}";
         }
 
-        protected override void AddValue(object? value)
+        public override void Add(PdfObject pdfObject)
         {
-            throw new NotImplementedException();
+            throw new Exception("Cannot nest scalar values");
         }
     }
 
@@ -167,20 +198,20 @@ namespace MetadataExtractor.Formats.Pdf
             return _value;
         }
 
-        protected override void AddValue(object? value)
+        public override void Add(PdfObject pdfObject)
         {
             if (_valueWasSet)
             {
                 throw new Exception("Value already set");
             }
-            _value = value;
+            _value = pdfObject;
             _valueWasSet = true;
         }
     }
 
     internal class PdfArray : PdfObject
     {
-        private readonly List<object?> _array;
+        private readonly List<PdfObject> _array;
 
         public override string Type => "array";
 
@@ -188,7 +219,7 @@ namespace MetadataExtractor.Formats.Pdf
 
         public PdfArray()
         {
-            _array = new List<object?>();
+            _array = new List<PdfObject>();
         }
 
         public override object? GetValue()
@@ -196,15 +227,15 @@ namespace MetadataExtractor.Formats.Pdf
             return _array;
         }
 
-        protected override void AddValue(object? value)
+        public override void Add(PdfObject pdfObject)
         {
-            _array.Add(value);
+            _array.Add(pdfObject);
         }
     }
 
     internal class PdfDictionary : PdfObject
     {
-        private readonly Dictionary<string, object?> _dictionary;
+        private readonly Dictionary<string, PdfObject> _dictionary;
 
         private string? _currentKey = null;
 
@@ -214,7 +245,7 @@ namespace MetadataExtractor.Formats.Pdf
 
         public PdfDictionary()
         {
-            _dictionary = new Dictionary<string, object?>();
+            _dictionary = new Dictionary<string, PdfObject>();
         }
 
         public override object? GetValue()
@@ -222,18 +253,18 @@ namespace MetadataExtractor.Formats.Pdf
             return _dictionary;
         }
 
-        protected override void AddValue(object? value)
+        public override void Add(PdfObject pdfObject)
         {
-            if (value is NameToken nameToken)
+            if (pdfObject.Type == "name")
             {
                 if (_currentKey is not null)
                 {
-                    _dictionary.Add(_currentKey, value);
+                    _dictionary.Add(_currentKey, pdfObject); // names can be values, too, in which case their encoding is probably UTF8
                     _currentKey = null;
                 }
                 else
                 {
-                    _currentKey = Encoding.ASCII.GetString(nameToken.Value); // documented dictionary keys are probably ASCII
+                    _currentKey = pdfObject.ToString(); // documented dictionary keys are probably ASCII
                 }
             }
             else
@@ -242,9 +273,9 @@ namespace MetadataExtractor.Formats.Pdf
                 {
                     return;
                 }
-                if (value is not NullToken)
+                if (pdfObject.Type != "null")
                 {
-                    _dictionary.Add(_currentKey, value);
+                    _dictionary.Add(_currentKey, pdfObject);
                 }
                 _currentKey = null;
             }
