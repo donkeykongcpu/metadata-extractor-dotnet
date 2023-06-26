@@ -145,7 +145,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
         private static PdfTokeniser GetTokeniserForInput(string input)
         {
-            StringByteProvider byteProvider = new StringByteProvider(input, 0, 100, ExtractionDirection.Forward);
+            StringByteProviderSource byteSource = new StringByteProviderSource(input, 0, ExtractionDirection.Forward);
+
+            BufferedItemProvider<byte> byteProvider = new BufferedItemProvider<byte>(byteSource, 16);
 
             PdfTokeniser tokeniser = new PdfTokeniser(byteProvider);
 
