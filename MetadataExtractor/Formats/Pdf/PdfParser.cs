@@ -70,9 +70,9 @@ namespace MetadataExtractor.Formats.Pdf
             }
         }
 
-        private readonly EnumeratedBufferedProvider<Token, DummyToken> _tokenProvider;
+        private readonly ItemProvider<Token> _tokenProvider;
 
-        public PdfParser(EnumeratedBufferedProvider<Token, DummyToken> tokenProvider)
+        public PdfParser(ItemProvider<Token> tokenProvider)
         {
             _tokenProvider = tokenProvider;
         }
@@ -86,10 +86,12 @@ namespace MetadataExtractor.Formats.Pdf
                 // first check if we have either an indirect object (objectNumber generation "obj" ... "endobj")
                 // or an indirect reference to an object (objectNumber generation "R")
 
-                if (_tokenProvider.PeekNextItem(0) is NumericIntegerToken && _tokenProvider.PeekNextItem(1) is NumericIntegerToken)
+                if (_tokenProvider.PeekNextItem(0) is NumericIntegerToken objectNumberToken
+                    && _tokenProvider.PeekNextItem(1) is NumericIntegerToken generationToken
+                    )
                 {
-                    var objectNumber = (_tokenProvider.PeekNextItem(0) as NumericIntegerToken)!.IntegerValue;
-                    var generation = (_tokenProvider.PeekNextItem(1) as NumericIntegerToken)!.IntegerValue;
+                    var objectNumber = objectNumberToken.IntegerValue;
+                    var generation = generationToken.IntegerValue;
 
                     if (_tokenProvider.PeekNextItem(2) is IndirectObjectBeginToken)
                     {
