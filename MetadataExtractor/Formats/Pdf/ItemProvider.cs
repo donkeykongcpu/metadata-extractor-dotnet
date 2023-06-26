@@ -24,9 +24,9 @@ namespace MetadataExtractor.Formats.Pdf
 
         protected int ItemsConsumed { get; private set; }
 
-        public bool HasNextItem => ItemsConsumed < AvailableItems;
+        public bool HasNextItem => IsItemAvailable(0);
 
-        protected abstract int AvailableItems { get; }
+        protected abstract bool IsItemAvailable(int delta);
 
         public int CurrentIndex => ItemSource.GetCurrentIndex(ItemsConsumed); // NOTE CurrentIndex is undefined when !HasNextItem
 
@@ -65,12 +65,19 @@ namespace MetadataExtractor.Formats.Pdf
                 throw new ArgumentOutOfRangeException(nameof(delta), "Cannot peek previous items");
             }
 
-            if (ItemsConsumed + delta >= AvailableItems)
+            ValidatePeekDelta(delta);
+
+            if (!IsItemAvailable(delta))
             {
                 return ItemSource.DummyItem;
             }
 
             return DoPeekNextItem(delta);
+        }
+
+        protected virtual void ValidatePeekDelta(int delta)
+        {
+            // always valid here
         }
 
         public void Consume(int count)
@@ -96,29 +103,30 @@ namespace MetadataExtractor.Formats.Pdf
 
         private int _count; // the number of items that are available in the circular buffer (in case _start == _end, the circular buffer can be completely empty or completely full)
 
-        public int BufferLength => _buffer.Length;
+        private bool _endReached;
 
-        private int _availableItems;
+        protected override bool IsItemAvailable(int delta)
+        {
+            if (!_endReached && !IsItemAvailableInBuffer(delta))
+            {
+                FillBuffer();
+            }
 
-        protected override int AvailableItems => _availableItems;
+            return IsItemAvailableInBuffer(delta);
+        }
 
         public BufferedItemProvider(ItemProviderSource<ItemType> itemSource, int bufferLength)
             : base(itemSource)
         {
             _buffer = new ItemType[bufferLength];
 
-            _start = _end = _count = _availableItems = 0;
+            _start = _end = _count = 0;
+
+            _endReached = false;
         }
 
         protected override ItemType DoGetNextItem()
         {
-            if (!IsItemAvailableInBuffer(0))
-            {
-                FillBuffer();
-            }
-
-            Debug.Assert(IsItemAvailableInBuffer(0));
-
             ItemType result = _buffer[_start];
 
             _start = (_start + 1) % _buffer.Length;
@@ -128,20 +136,16 @@ namespace MetadataExtractor.Formats.Pdf
             return result;
         }
 
-        protected override ItemType DoPeekNextItem(int delta)
+        protected override void ValidatePeekDelta(int delta)
         {
             if (delta >= _buffer.Length)
             {
                 throw new ArgumentOutOfRangeException(nameof(delta), $"Cannot peek that far ahead (max is {_buffer.Length - 1} items)");
             }
+        }
 
-            if (!IsItemAvailableInBuffer(delta))
-            {
-                FillBuffer();
-            }
-
-            Debug.Assert(IsItemAvailableInBuffer(delta));
-
+        protected override ItemType DoPeekNextItem(int delta)
+        {
             return _buffer[(_start + delta) % _buffer.Length];
         }
 
@@ -156,6 +160,11 @@ namespace MetadataExtractor.Formats.Pdf
 
             Debug.Assert(itemsToRead > 0);
 
+            if (_endReached)
+            {
+                return;
+            }
+
             ItemType[] items = ItemSource.GetNextItems(itemsToRead);
 
             foreach (ItemType item in items)
@@ -165,8 +174,11 @@ namespace MetadataExtractor.Formats.Pdf
                 _end = (_end + 1) % _buffer.Length;
 
                 _count++;
+            }
 
-                _availableItems++;
+            if (items.Length < itemsToRead)
+            {
+                _endReached = true;
             }
         }
     }
@@ -175,7 +187,10 @@ namespace MetadataExtractor.Formats.Pdf
     {
         private readonly ItemType[] _items;
 
-        protected override int AvailableItems => _items.Length;
+        protected override bool IsItemAvailable(int delta)
+        {
+            return (ItemsConsumed + delta < _items.Length);
+        }
 
         public BoundedItemProvider(ItemProviderSource<ItemType> itemSource, int requestedCount)
           : base(itemSource)
@@ -280,7 +295,11 @@ namespace MetadataExtractor.Formats.Pdf
         {
             int remainingItems = Math.Max(0, (int)_availableLength - _index);
 
-            if (count <= remainingItems)
+            if (remainingItems < 1)
+            {
+                return new byte[] { };
+            }
+            else if (count <= remainingItems)
             {
                 int startIndex = _index;
                 _index += count;
@@ -288,12 +307,10 @@ namespace MetadataExtractor.Formats.Pdf
             }
             else
             {
-                // return all remaining items
-                Debug.Assert(remainingItems > 0); // there must be at least one, otherwise GetNextItems is not called
+                // return all remaining items (length is < count)
                 int startIndex = _index;
                 _index += count;
                 return GetBytes(startIndex, remainingItems);
-                //result.AddRange(new byte[count - remainingItems]);
             }
         }
 
@@ -301,7 +318,11 @@ namespace MetadataExtractor.Formats.Pdf
         {
             int remainingItems = Math.Max(0, _index + 1);
 
-            if (count <= remainingItems)
+            if (remainingItems < 1)
+            {
+                return new byte[] { };
+            }
+            else if (count <= remainingItems)
             {
                 int startIndex = _index - count + 1;
                 _index -= count;
@@ -309,12 +330,10 @@ namespace MetadataExtractor.Formats.Pdf
             }
             else
             {
-                // return all remaining items
-                Debug.Assert(remainingItems > 0); // there must be at least one, otherwise GetNextItems is not called
+                // return all remaining items (length is < count)
                 int startIndex = _index - remainingItems + 1;
                 _index -= count;
                 return GetBytes(startIndex, remainingItems).Reverse().ToArray();
-              //  result.AddRange(new byte[count - remainingItems]);
             }
         }
     }
