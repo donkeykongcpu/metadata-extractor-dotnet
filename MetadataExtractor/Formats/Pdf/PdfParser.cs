@@ -65,14 +65,30 @@ namespace MetadataExtractor.Formats.Pdf
             }
         }
 
+        public static object? ParseObject(string input, int startIndex)
+        {
+            StringByteProviderSource byteProviderSource = new StringByteProviderSource(input, startIndex, ExtractionDirection.Forward);
+
+            BufferedItemProvider<byte> byteProvider = new BufferedItemProvider<byte>(byteProviderSource, 1024);
+
+            ItemProvider<Token> tokenProvider = GetTokenProvider(byteProvider);
+
+            return ParseObject(tokenProvider);
+        }
+
         public static object? ParseObject(IndexedReader reader, int startIndex)
         {
-            var parseContext = new ParseContext();
-
             IndexedReaderByteProviderSource byteProviderSource = new IndexedReaderByteProviderSource(reader, startIndex, ExtractionDirection.Forward);
 
             BufferedItemProvider<byte> byteProvider = new BufferedItemProvider<byte>(byteProviderSource, 1024);
 
+            ItemProvider<Token> tokenProvider = GetTokenProvider(byteProvider);
+
+            return ParseObject(tokenProvider);
+        }
+
+        private static ItemProvider<Token> GetTokenProvider(ItemProvider<byte> byteProvider)
+        {
             PdfTokeniser tokeniser = new PdfTokeniser(byteProvider);
 
             IEnumerable<Token> tokens = tokeniser.Tokenise();
@@ -80,6 +96,13 @@ namespace MetadataExtractor.Formats.Pdf
             EnumeratedItemProviderSource<Token> tokenSource = new EnumeratedItemProviderSource<Token>(tokens, new DummyToken());
 
             BufferedItemProvider<Token> tokenProvider = new BufferedItemProvider<Token>(tokenSource, 5);
+
+            return tokenProvider;
+        }
+
+        public static object? ParseObject(ItemProvider<Token> tokenProvider)
+        {
+            var parseContext = new ParseContext();
 
             while (tokenProvider.HasNextItem)
             {
