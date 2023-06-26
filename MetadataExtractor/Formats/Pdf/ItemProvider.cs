@@ -4,25 +4,50 @@ using System;
 
 namespace MetadataExtractor.Formats.Pdf
 {
+    public interface ItemProviderSource<ItemType>
+    {
+        ItemType DummyItem { get; }
+
+        /// <summary>
+        /// Returns as many items as possible, or an empty array if no more items are available.
+        /// </summary>
+        /// <param name="requestedCount">The maximum number of items to return, from the current position.</param>
+        /// <returns>The next items, from the current position.</returns>
+        ItemType[] GetNextItems(int requestedCount);
+
+        int GetCurrentIndex(int itemsConsumed);
+    }
+
     public abstract class ItemProvider<ItemType>
     {
-        private int _itemsConsumed;
+        protected readonly ItemProviderSource<ItemType> ItemSource;
 
-        public int ItemsConsumed => _itemsConsumed;
+        protected int ItemsConsumed { get; private set; }
 
-        protected ItemProvider()
+        public bool HasNextItem => ItemsConsumed < AvailableItems;
+
+        protected abstract int AvailableItems { get; }
+
+        public int CurrentIndex => ItemSource.GetCurrentIndex(ItemsConsumed); // NOTE CurrentIndex is undefined when !HasNextItem
+
+        protected ItemProvider(ItemProviderSource<ItemType> itemSource)
         {
-            _itemsConsumed = 0;
+            ItemSource = itemSource;
+
+            ItemsConsumed = 0;
         }
 
         public ItemType GetNextItem()
         {
-            _itemsConsumed++;
+            ItemsConsumed++;
+
+            if (!HasNextItem)
+            {
+                return ItemSource.DummyItem;
+            }
 
             return DoGetNextItem();
         }
-
-        protected abstract ItemType DoGetNextItem();
 
         public ItemType[] GetNextItems(int count)
         {
@@ -43,21 +68,28 @@ namespace MetadataExtractor.Formats.Pdf
                 throw new ArgumentOutOfRangeException(nameof(delta), "Cannot peek previous items");
             }
 
+            if (ItemsConsumed + delta > AvailableItems)
+            {
+                return ItemSource.DummyItem;
+            }
+
             return DoPeekNextItem(delta);
         }
-
-        protected abstract ItemType DoPeekNextItem(int delta);
 
         public void Consume(int count)
         {
             for (int i = 0; i < count; i++)
             {
-                GetNextItem();
+                _ = GetNextItem();
             }
         }
+
+        protected abstract ItemType DoGetNextItem();
+
+        protected abstract ItemType DoPeekNextItem(int delta);
     }
 
-    public abstract class BufferedItemProvider<ItemType> : ItemProvider<ItemType>
+    public class BufferedItemProvider<ItemType> : ItemProvider<ItemType>
     {
         private readonly ItemType[] _buffer;
 
@@ -68,13 +100,17 @@ namespace MetadataExtractor.Formats.Pdf
         private int _count; // the number of items that are available in the circular buffer (in case _start == _end, the circular buffer can be completely empty or completely full)
 
         public int BufferLength => _buffer.Length;
-    
-        protected BufferedItemProvider(int bufferLength)
-            : base()
+
+        private int _availableItems;
+
+        protected override int AvailableItems => _availableItems;
+
+        public BufferedItemProvider(ItemProviderSource<ItemType> itemSource, int bufferLength)
+            : base(itemSource)
         {
             _buffer = new ItemType[bufferLength];
 
-            _start = _end = _count = 0;
+            _start = _end = _count = _availableItems = 0;
         }
 
         protected override ItemType DoGetNextItem()
@@ -123,7 +159,7 @@ namespace MetadataExtractor.Formats.Pdf
 
             Debug.Assert(itemsToRead > 0);
 
-            ItemType[] items = GetNextItemsFromSource(itemsToRead);
+            ItemType[] items = ItemSource.GetNextItems(itemsToRead);
 
             foreach (ItemType item in items)
             {
@@ -132,50 +168,70 @@ namespace MetadataExtractor.Formats.Pdf
                 _end = (_end + 1) % _buffer.Length;
 
                 _count++;
+
+                _availableItems++;
             }
         }
-
-        protected abstract ItemType[] GetNextItemsFromSource(int count);
     }
 
-    public class EnumeratedBufferedProvider<ItemType, DummyItemType> : BufferedItemProvider<ItemType> where DummyItemType : ItemType
+    public class BoundedItemProvider<ItemType> : ItemProvider<ItemType>
+    {
+        private readonly ItemType[] _items;
+
+        protected override int AvailableItems => _items.Length;
+
+        public BoundedItemProvider(ItemProviderSource<ItemType> itemSource, int requestedCount)
+          : base(itemSource)
+        {
+            _items = itemSource.GetNextItems(requestedCount);
+        }
+
+        protected override ItemType DoGetNextItem()
+        {
+            return _items[ItemsConsumed];
+        }
+
+        protected override ItemType DoPeekNextItem(int delta)
+        {
+            return _items[ItemsConsumed + delta];
+        }
+    }
+
+    public class EnumeratedItemProviderSource<ItemType> : ItemProviderSource<ItemType>
     {
         private readonly IEnumerator<ItemType> _enumerator;
 
-        private readonly DummyItemType _missingItemSentinel;
+        public ItemType DummyItem { get; }
 
-        public bool HasNextItem => PeekNextItem(0) is not DummyItemType;
+        public int GetCurrentIndex(int itemsConsumed)
+        {
+            return itemsConsumed;
+        }
 
-        public EnumeratedBufferedProvider(IEnumerable<ItemType> sequence, DummyItemType missingItemSentinel, int bufferLength)
-            : base(bufferLength)
+        public EnumeratedItemProviderSource(IEnumerable<ItemType> sequence, ItemType dummyItem)
         {
             _enumerator = sequence.GetEnumerator();
 
-            _missingItemSentinel = missingItemSentinel;
+            DummyItem = dummyItem; // reusing the same instance
         }
 
-        sealed protected override ItemType[] GetNextItemsFromSource(int count)
+        public ItemType[] GetNextItems(int requestedCount)
         {
-            List<ItemType> result = new List<ItemType>(count);
-            for (int i = 0; i < count; i++)
+            List<ItemType> result = new(requestedCount);
+            for (var i = 0; i < requestedCount; i++)
             {
-                bool hasNext = _enumerator.MoveNext();
+                var hasNext = _enumerator.MoveNext();
                 if (hasNext)
                 {
                     result.Add(_enumerator.Current);
                 }
                 else
                 {
-                    result.Add(_missingItemSentinel); // might reuse the same instance
+                    break; // end reached
                 }
             }
             return result.ToArray();
         }
-
-        //public ItemType[] TestGetNextItems(int count)
-        //{
-        //    return GetNextItems(count);
-        //}
     }
 
     public enum ExtractionDirection
@@ -184,7 +240,7 @@ namespace MetadataExtractor.Formats.Pdf
         Backward = -1,
     }
 
-    public abstract class ByteStreamBufferedProvider : BufferedItemProvider<byte>
+    public abstract class ByteStreamItemProviderSource : ItemProviderSource<byte>
     {
         private readonly ExtractionDirection _extractionDirection;
 
@@ -194,26 +250,23 @@ namespace MetadataExtractor.Formats.Pdf
 
         private int _index; // the index of the next byte to be returned (can go above _availableLength when extracting forward, or below zero when extracting backward, indicating the end of input)
 
-        private int _bytesRead; // TODO remove this
+        public byte DummyItem => 0;
 
-        public bool HasNextItem => _extractionDirection == ExtractionDirection.Forward
-            ? _startOffset + ItemsConsumed < _availableLength
-            : _startOffset - ItemsConsumed >= 0
-        ;
+        public int GetCurrentIndex(int itemsConsumed)
+        {
+            return _startOffset + itemsConsumed * (int)_extractionDirection;
+        }
 
-        public int CurrentIndex => _startOffset + ItemsConsumed * (int)_extractionDirection; // NOTE CurrentIndex is undefined when !HasNextItem
-
-        protected ByteStreamBufferedProvider(long availableLength, int startOffset, int bufferLength, ExtractionDirection extractionDirection)
-            : base(bufferLength)
+        protected ByteStreamItemProviderSource(int startOffset, long availableLength, ExtractionDirection extractionDirection)
         {
             _extractionDirection = extractionDirection;
 
             _availableLength = availableLength;
 
-            _index = _startOffset = _extractionDirection == ExtractionDirection.Forward ? startOffset : (int)availableLength - startOffset - 1; // TODO account for startIndex when going backward
+            _index = _startOffset = _extractionDirection == ExtractionDirection.Forward ? startOffset : (int)availableLength - startOffset - 1;
         }
 
-        sealed protected override byte[] GetNextItemsFromSource(int count)
+        public byte[] GetNextItems(int count)
         {
             return _extractionDirection == ExtractionDirection.Forward ? GetNextItemsForward(count) : GetNextItemsBackward(count);
         }
@@ -228,22 +281,16 @@ namespace MetadataExtractor.Formats.Pdf
             {
                 int startIndex = _index;
                 _index += count;
-                _bytesRead += count;
                 return GetBytes(startIndex, count);
             }
             else
             {
-                // return all remaining items, adding zero bytes for the missing items
-                List<byte> result = new List<byte>();
-                if (remainingItems > 0)
-                {
-                    int startIndex = _index;
-                    _index += count;
-                    _bytesRead += remainingItems;
-                    result.AddRange(GetBytes(startIndex, remainingItems));
-                }
-                result.AddRange(new byte[count - remainingItems]);
-                return result.ToArray();
+                // return all remaining items
+                Debug.Assert(remainingItems > 0); // there must be at least one, otherwise GetNextItems is not called
+                int startIndex = _index;
+                _index += count;
+                return GetBytes(startIndex, remainingItems);
+                //result.AddRange(new byte[count - remainingItems]);
             }
         }
 
@@ -255,37 +302,26 @@ namespace MetadataExtractor.Formats.Pdf
             {
                 int startIndex = _index - count + 1;
                 _index -= count;
-                _bytesRead += count;
                 return GetBytes(startIndex, count).Reverse().ToArray();
             }
             else
             {
-                // return all remaining items, adding zero bytes for the missing items
-                List<byte> result = new List<byte>();
-                if (remainingItems > 0)
-                {
-                    int startIndex = _index - remainingItems + 1;
-                    _index -= count;
-                    _bytesRead += remainingItems;
-                    result.AddRange(GetBytes(startIndex, remainingItems).Reverse().ToArray());
-                }
-                result.AddRange(new byte[count - remainingItems]);
-                return result.ToArray();
+                // return all remaining items
+                Debug.Assert(remainingItems > 0); // there must be at least one, otherwise GetNextItems is not called
+                int startIndex = _index - remainingItems + 1;
+                _index -= count;
+                return GetBytes(startIndex, remainingItems).Reverse().ToArray();
+              //  result.AddRange(new byte[count - remainingItems]);
             }
         }
-
-        //public byte[] TestGetNextItems(int count)
-        //{
-        //    return GetNextItemsFromSource(count);
-        //}
     }
 
-    internal class IndexedReaderByteProvider : ByteStreamBufferedProvider
+    internal class IndexedReaderByteProviderSource : ByteStreamItemProviderSource
     {
         private readonly IndexedReader _reader;
 
-        public IndexedReaderByteProvider(IndexedReader reader, int startIndex, int bufferLength, ExtractionDirection extractionDirection)
-            : base(reader.Length, startIndex, bufferLength, extractionDirection)
+        public IndexedReaderByteProviderSource(IndexedReader reader, int startIndex, ExtractionDirection extractionDirection)
+            : base(startIndex, reader.Length, extractionDirection)
         {
             _reader = reader;
         }
@@ -295,25 +331,35 @@ namespace MetadataExtractor.Formats.Pdf
             Debug.Assert(index >= 0);
             Debug.Assert(count > 0);
 
-            return _reader.GetBytes(index, count);
+            byte[] result = _reader.GetBytes(index, count);
+
+            Debug.Assert(result.Length == count);
+
+            return result;
         }
     }
 
-    public class StringByteProvider : ByteStreamBufferedProvider
+    public class StringByteProviderSource : ByteStreamItemProviderSource
     {
         private readonly byte[] _input;
 
-        public StringByteProvider(string input, int startIndex, int bufferLength, ExtractionDirection extractionDirection)
-            : base(input.Length, startIndex, bufferLength, extractionDirection)
+        public StringByteProviderSource(string input, int startIndex, ExtractionDirection extractionDirection)
+            : base(startIndex, input.Length, extractionDirection)
         {
             // input string must only contain 1-byte characters
-
             _input = input.ToCharArray().Select(x => (byte)x).ToArray();
         }
 
         protected override byte[] GetBytes(int index, int count)
         {
-            return _input.Skip(index).Take(count).ToArray();
+            Debug.Assert(index >= 0);
+            Debug.Assert(count > 0);
+
+            byte[] result = _input.Skip(index).Take(count).ToArray();
+
+            Debug.Assert(result.Length == count);
+
+            return result;
         }
     }
 }
