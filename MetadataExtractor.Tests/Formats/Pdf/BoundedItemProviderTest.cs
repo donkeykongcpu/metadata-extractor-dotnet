@@ -4,47 +4,69 @@ using MetadataExtractor.Formats.Pdf;
 
 namespace MetadataExtractor.Tests.Formats.Pdf
 {
-    /// <summary>Unit tests for <see cref="StringByteProvider"/>.</summary>
+    /// <summary>Unit tests for <see cref="BoundedItemProvider{ItemType}"/>.</summary>
     /// <author>Drew Noakes https://drewnoakes.com</author>
-    public sealed class StringByteProviderForwardTest
+    public sealed class BoundedItemProviderTest
     {
-        private static ByteStreamBufferedProvider GetForwardProvider(int bufferLength, int startIndex)
+        private static BoundedItemProvider<byte> GetProvider(int startIndex, int requestedCount)
         {
             string input = @"123456789";
 
-            return new StringByteProvider(input, startIndex, bufferLength, ExtractionDirection.Forward);
+            StringByteProviderSource byteSource = new StringByteProviderSource(input, startIndex, ExtractionDirection.Forward);
+
+            return new BoundedItemProvider<byte>(byteSource, requestedCount);
         }
 
+
         [Fact]
-        public void TestGetNextItemForwardStartIndexZero()
+        public void TestGetNextItemStartIndexZero()
         {
-            ByteStreamBufferedProvider byteProvider = GetForwardProvider(bufferLength: 2, startIndex: 0);
+            ItemProvider<byte> byteProvider = GetProvider(startIndex: 0, requestedCount: 9);
 
             for (char c = '1'; c <= '9'; c++)
             {
                 Assert.Equal(c, (char)byteProvider.GetNextItem());
             }
+
+            for (int i = 0; i < 20; i++)
+            {
+                Assert.Equal(0, (char)byteProvider.GetNextItem());
+            }
         }
 
         [Fact]
-        public void TestGetNextItemForwardStartIndexNotZero()
+        public void TestGetNextItemStartIndexNonZero()
         {
-            ByteStreamBufferedProvider byteProvider = GetForwardProvider(bufferLength: 2, startIndex: 2);
+            ItemProvider<byte> byteProvider = GetProvider(startIndex: 2, requestedCount: 7);
 
             for (char c = '3'; c <= '9'; c++)
             {
                 Assert.Equal(c, (char)byteProvider.GetNextItem());
             }
 
-            Assert.Equal(0, (char)byteProvider.GetNextItem());
-            Assert.Equal(0, (char)byteProvider.GetNextItem());
+            for (int i = 0; i < 20; i++)
+            {
+                Assert.Equal(0, (char)byteProvider.GetNextItem());
+            }
+
+            byteProvider = GetProvider(startIndex: 5, requestedCount: 10);
+
+            for (char c = '6'; c <= '9'; c++)
+            {
+                Assert.Equal(c, (char)byteProvider.GetNextItem());
+            }
+
+            for (int i = 0; i < 20; i++)
+            {
+                Assert.Equal(0, (char)byteProvider.GetNextItem());
+            }
         }
 
 
         [Fact]
-        public void TestGetNextItemsForwardStartIndexZero()
+        public void TestGetNextItemsStartIndexZero()
         {
-            ByteStreamBufferedProvider byteProvider = GetForwardProvider(bufferLength: 2, startIndex: 0);
+            ItemProvider<byte> byteProvider = GetProvider(startIndex: 0, requestedCount: 9);
 
             Assert.Equal(new byte[] { (byte)'1', (byte)'2', (byte)'3' }, byteProvider.GetNextItems(3));
 
@@ -55,9 +77,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
         }
 
         [Fact]
-        public void TestGetNextItemsForwardStartIndexNotZero()
+        public void TestGetNextItemsStartIndexNonZero()
         {
-            ByteStreamBufferedProvider byteProvider = GetForwardProvider(bufferLength: 2, startIndex: 2);
+            ItemProvider<byte> byteProvider = GetProvider(startIndex: 2, requestedCount: 9);
 
             Assert.Equal(new byte[] { (byte)'3', (byte)'4', (byte)'5' }, byteProvider.GetNextItems(3));
 
@@ -69,9 +91,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
 
         [Fact]
-        public void TestPeekNextItemForwardStartIndexZero()
+        public void TestPeekNextItemStartIndexZero()
         {
-            ByteStreamBufferedProvider byteProvider = GetForwardProvider(bufferLength: 3, startIndex: 0);
+            ItemProvider<byte> byteProvider = GetProvider(startIndex: 0, requestedCount: 9);
 
             Assert.Equal('1', (char)byteProvider.PeekNextItem(0));
             Assert.Equal('2', (char)byteProvider.PeekNextItem(1));
@@ -108,9 +130,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
         }
 
         [Fact]
-        public void TestPeekNextItemForwardStartIndexNotZero()
+        public void TestPeekNextItemStartIndexNonZero()
         {
-            ByteStreamBufferedProvider byteProvider = GetForwardProvider(bufferLength: 3, startIndex: 2);
+            ItemProvider<byte> byteProvider = GetProvider(startIndex: 2, requestedCount: 9);
 
             Assert.Equal('3', (char)byteProvider.PeekNextItem(0));
             Assert.Equal('4', (char)byteProvider.PeekNextItem(1));
@@ -146,9 +168,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
 
         [Fact]
-        public void TestConsumeForwardStartIndexZero()
+        public void TestConsumeStartIndexZero()
         {
-            ByteStreamBufferedProvider byteProvider = GetForwardProvider(bufferLength: 2, startIndex: 0);
+            ItemProvider<byte> byteProvider = GetProvider(startIndex: 0, requestedCount: 9);
 
             Assert.Equal('1', (char)byteProvider.PeekNextItem(0));
 
@@ -177,9 +199,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
         }
 
         [Fact]
-        public void TestConsumeForwardStartIndexNotZero()
+        public void TestConsumeStartIndexNonZero()
         {
-            ByteStreamBufferedProvider byteProvider = GetForwardProvider(bufferLength: 2, startIndex: 2);
+            ItemProvider<byte> byteProvider = GetProvider(startIndex: 2, requestedCount: 9);
 
             Assert.Equal('3', (char)byteProvider.PeekNextItem(0));
 
@@ -212,9 +234,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
 
         [Fact]
-        public void TestHasNextItemForwardStartIndexZero()
+        public void TestHasNextItemStartIndexZero()
         {
-            ByteStreamBufferedProvider byteProvider = GetForwardProvider(bufferLength: 2, startIndex: 0);
+            ItemProvider<byte> byteProvider = GetProvider(startIndex: 0, requestedCount: 9);
 
             Assert.True(byteProvider.HasNextItem);
 
@@ -232,9 +254,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
         }
 
         [Fact]
-        public void TestHasNextItemForwardStartIndexNotZero()
+        public void TestHasNextItemStartIndexNonZero()
         {
-            ByteStreamBufferedProvider byteProvider = GetForwardProvider(bufferLength: 2, startIndex: 2);
+            ItemProvider<byte> byteProvider = GetProvider(startIndex: 2, requestedCount: 9);
 
             Assert.True(byteProvider.HasNextItem);
 
@@ -249,13 +271,31 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             byteProvider.Consume(1); // --
 
             Assert.False(byteProvider.HasNextItem);
+
+            // requested count less than 9
+
+            byteProvider = GetProvider(startIndex: 2, requestedCount: 3); // 3 4 5
+
+            Assert.True(byteProvider.HasNextItem);
+
+            byteProvider.Consume(2); // 3 4
+
+            Assert.True(byteProvider.HasNextItem);
+
+            byteProvider.Consume(1); // 5
+
+            Assert.False(byteProvider.HasNextItem);
+
+            byteProvider.Consume(1); // --
+
+            Assert.False(byteProvider.HasNextItem);
         }
 
 
         [Fact]
-        public void TestCurrentIndexForwardStartIndexZero()
+        public void TestCurrentIndexStartIndexZero()
         {
-            ByteStreamBufferedProvider byteProvider = GetForwardProvider(bufferLength: 3, startIndex: 0);
+            ItemProvider<byte> byteProvider = GetProvider(startIndex: 0, requestedCount: 9);
 
             Assert.Equal(0, byteProvider.CurrentIndex);
 
@@ -290,9 +330,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
         }
 
         [Fact]
-        public void TestCurrentIndexForwardStartIndexNotZero()
+        public void TestCurrentIndexStartIndexNoZero()
         {
-            ByteStreamBufferedProvider byteProvider = GetForwardProvider(bufferLength: 3, startIndex: 2);
+            ItemProvider<byte> byteProvider = GetProvider(startIndex: 2, requestedCount: 9);
 
             Assert.Equal(2, byteProvider.CurrentIndex);
 

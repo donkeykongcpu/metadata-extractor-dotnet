@@ -39,14 +39,11 @@ namespace MetadataExtractor.Formats.Pdf
 
         public ItemType GetNextItem()
         {
+            ItemType result = HasNextItem ? DoGetNextItem() : ItemSource.DummyItem;
+
             ItemsConsumed++;
 
-            if (!HasNextItem)
-            {
-                return ItemSource.DummyItem;
-            }
-
-            return DoGetNextItem();
+            return result;
         }
 
         public ItemType[] GetNextItems(int count)
@@ -68,7 +65,7 @@ namespace MetadataExtractor.Formats.Pdf
                 throw new ArgumentOutOfRangeException(nameof(delta), "Cannot peek previous items");
             }
 
-            if (ItemsConsumed + delta > AvailableItems)
+            if (ItemsConsumed + delta >= AvailableItems)
             {
                 return ItemSource.DummyItem;
             }
