@@ -201,6 +201,8 @@ namespace MetadataExtractor.Formats.Pdf
     {
         private readonly IEnumerator<ItemType> _enumerator;
 
+        private bool _endReached;
+
         public ItemType DummyItem { get; }
 
         public int GetCurrentIndex(int itemsConsumed)
@@ -213,10 +215,13 @@ namespace MetadataExtractor.Formats.Pdf
             _enumerator = sequence.GetEnumerator();
 
             DummyItem = dummyItem; // reusing the same instance
+
+            _endReached = false;
         }
 
         public ItemType[] GetNextItems(int requestedCount)
         {
+            Debug.Assert(!_endReached);
             List<ItemType> result = new(requestedCount);
             for (var i = 0; i < requestedCount; i++)
             {
@@ -227,7 +232,8 @@ namespace MetadataExtractor.Formats.Pdf
                 }
                 else
                 {
-                    break; // end reached
+                    _endReached = true;
+                    break;
                 }
             }
             return result.ToArray();
