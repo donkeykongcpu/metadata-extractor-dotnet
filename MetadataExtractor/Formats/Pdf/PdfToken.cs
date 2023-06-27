@@ -29,37 +29,37 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
-    internal class DummyToken : Token
+    public class DummyToken : Token
     {
         public override string Type => "dummy";
         public DummyToken() : base("dummy", -1) { }
     }
 
-    internal class IndirectReferenceMarkerToken : Token
+    public class IndirectReferenceMarkerToken : Token
     {
         public override string Type => "R";
         public IndirectReferenceMarkerToken(int startIndex) : base("R", startIndex) { }
     }
 
-    internal class IndirectObjectBeginToken : Token
+    public class IndirectObjectBeginToken : Token
     {
         public override string Type => "obj";
         public IndirectObjectBeginToken(int startIndex) : base("obj", startIndex) { }
     }
 
-    internal class IndirectObjectEndToken : Token
+    public class IndirectObjectEndToken : Token
     {
         public override string Type => "endobj";
         public IndirectObjectEndToken(int startIndex) : base("endobj", startIndex) { }
     }
 
-    internal class StreamBeginToken : Token
+    public class StreamBeginToken : Token
     {
         public override string Type => "stream";
         public StreamBeginToken(int startIndex) : base("stream", startIndex) { }
     }
 
-    internal class NullToken : Token
+    public class NullToken : Token
     {
         public override string Type => "null";
         public NullToken(int startIndex) : base("null", startIndex) { }
@@ -69,7 +69,7 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
-    internal class BooleanToken : Token
+    public class BooleanToken : Token
     {
         public bool BooleanValue { get; }
 
@@ -120,25 +120,25 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
-    internal class ArrayBeginToken : Token
+    public class ArrayBeginToken : Token
     {
         public override string Type => "array-begin";
         public ArrayBeginToken(int startIndex) : base("[", startIndex) { }
     }
 
-    internal class ArrayEndToken : Token
+    public class ArrayEndToken : Token
     {
         public override string Type => "array-end";
         public ArrayEndToken(int startIndex) : base("]", startIndex) { }
     }
 
-    internal class DictionaryBeginToken : Token
+    public class DictionaryBeginToken : Token
     {
         public override string Type => "dictionary-begin";
         public DictionaryBeginToken(int startIndex) : base("<<", startIndex) { }
     }
 
-    internal class DictionaryEndToken : Token
+    public class DictionaryEndToken : Token
     {
         public override string Type => "dictionary-end";
         public DictionaryEndToken(int startIndex) : base(">>", startIndex) { }
