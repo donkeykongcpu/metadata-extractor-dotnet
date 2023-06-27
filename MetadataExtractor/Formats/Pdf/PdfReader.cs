@@ -13,7 +13,7 @@ using DirectoryList = System.Collections.Generic.IReadOnlyList<MetadataExtractor
 
 namespace MetadataExtractor.Formats.Pdf
 {
-    public struct IndirectReference
+    public struct ObjectIdentifier
     {
         /// <summary>
         /// The sequential object number.
@@ -25,13 +25,13 @@ namespace MetadataExtractor.Formats.Pdf
         /// </summary>
         public ushort Generation { get; }
 
-        public IndirectReference(uint objectNumber, ushort generation)
+        public ObjectIdentifier(uint objectNumber, ushort generation)
         {
             ObjectNumber = objectNumber;
             Generation = generation;
         }
 
-        public IndirectReference(int objectNumber, int generation)
+        public ObjectIdentifier(int objectNumber, int generation)
         {
             if (objectNumber < 0)
             {

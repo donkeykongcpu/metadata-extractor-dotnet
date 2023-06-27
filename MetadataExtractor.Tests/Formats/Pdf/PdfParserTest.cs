@@ -61,8 +61,8 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                     case "name":
                         return ((StringValue)value1)!.Bytes.EqualTo(((StringValue)value2)!.Bytes);
                     case "indirect-reference":
-                        return ((IndirectReference)value1).ObjectNumber == ((IndirectReference)value2).ObjectNumber
-                            && ((IndirectReference)value1).Generation == ((IndirectReference)value2).Generation;
+                        return ((ObjectIdentifier)value1).ObjectNumber == ((ObjectIdentifier)value2).ObjectNumber
+                            && ((ObjectIdentifier)value1).Generation == ((ObjectIdentifier)value2).Generation;
                     case "array":
                         return ((List<PdfObject>)value1).SequenceEqual((List<PdfObject>)value2, this);
                     case "dictionary":

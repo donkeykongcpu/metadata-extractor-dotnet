@@ -62,12 +62,12 @@ namespace MetadataExtractor.Formats.Pdf
 
         public static PdfScalarValue FromIndirectReference(uint objectNumber, ushort generation)
         {
-            return new PdfScalarValue("indirect-reference", new IndirectReference(objectNumber, generation));
+            return new PdfScalarValue("indirect-reference", new ObjectIdentifier(objectNumber, generation));
         }
 
         public static PdfScalarValue FromIndirectReference(int objectNumber, int generation)
         {
-            return new PdfScalarValue("indirect-reference", new IndirectReference(objectNumber, generation));
+            return new PdfScalarValue("indirect-reference", new ObjectIdentifier(objectNumber, generation));
         }
 
         public static PdfScalarValue FromToken(Token token)
@@ -134,24 +134,24 @@ namespace MetadataExtractor.Formats.Pdf
 
     public class PdfIndirectObject : PdfRoot
     {
-        private readonly IndirectReference _indirectReference;
+        private readonly ObjectIdentifier _objectIdentifier;
 
         public override string Type => "indirect-object";
 
-        public uint ObjectNumber => _indirectReference.ObjectNumber;
+        public uint ObjectNumber => _objectIdentifier.ObjectNumber;
 
-        public ushort Generation => _indirectReference.Generation;
+        public ushort Generation => _objectIdentifier.Generation;
 
         public PdfIndirectObject(uint objectNumber, ushort generation)
             : base()
         {
-            _indirectReference = new IndirectReference(objectNumber, generation);
+            _objectIdentifier = new ObjectIdentifier(objectNumber, generation);
         }
 
         public PdfIndirectObject(int objectNumber, int generation)
             : base()
         {
-            _indirectReference = new IndirectReference(objectNumber, generation);
+            _objectIdentifier = new ObjectIdentifier(objectNumber, generation);
         }
     }
 
