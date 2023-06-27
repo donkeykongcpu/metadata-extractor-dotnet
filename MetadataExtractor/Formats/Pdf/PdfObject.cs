@@ -108,6 +108,18 @@ namespace MetadataExtractor.Formats.Pdf
         {
             Value = value;
         }
+
+        public PdfIndirectReference(uint objectNumber, ushort generationNumber)
+           : base()
+        {
+            Value = new ObjectIdentifier(objectNumber, generationNumber);
+        }
+
+        public PdfIndirectReference(int objectNumber, int generationNumber)
+            : base()
+        {
+            Value = new ObjectIdentifier(objectNumber, generationNumber);
+        }
     }
 
     public class PdfStream : PdfObject
@@ -186,7 +198,7 @@ namespace MetadataExtractor.Formats.Pdf
         public ObjectIdentifier Identifier { get; }
 
         public PdfIndirectObject(uint objectNumber, ushort generationNumber)
-         : base()
+            : base()
         {
             Identifier = new ObjectIdentifier(objectNumber, generationNumber);
         }
