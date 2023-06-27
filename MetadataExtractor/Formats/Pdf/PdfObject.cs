@@ -57,86 +57,6 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
-    public class PdfScalarValue : PdfObject
-    {
-        private readonly string _type;
-
-        private readonly object? _value;
-
-        public override string Type => _type;
-
-        public static PdfScalarValue FromIndirectReference(uint objectNumber, ushort generation)
-        {
-            return new PdfScalarValue("indirect-reference", new ObjectIdentifier(objectNumber, generation));
-        }
-
-        public static PdfScalarValue FromIndirectReference(int objectNumber, int generation)
-        {
-            return new PdfScalarValue("indirect-reference", new ObjectIdentifier(objectNumber, generation));
-        }
-
-        public static PdfScalarValue FromToken(Token token)
-        {
-            if (token is NullToken)
-            {
-                return new PdfScalarValue("null", null);
-            }
-            else if (token is BooleanToken booleanToken)
-            {
-                return new PdfScalarValue("boolean", booleanToken.BooleanValue);
-            }
-            else if (token is NumericIntegerToken numericIntegerToken)
-            {
-                return new PdfScalarValue("numeric-integer", numericIntegerToken.IntegerValue);
-            }
-            else if (token is NumericRealToken numericRealToken)
-            {
-                return new PdfScalarValue("numeric-real", numericRealToken.RealValue);
-            }
-            else if (token is StringToken stringToken)
-            {
-                return new PdfScalarValue("string", stringToken.StringValue); // TODO encoding is context-specific
-            }
-            else if (token is NameToken nameToken)
-            {
-                return new PdfScalarValue("name", nameToken.StringValue);
-            }
-            else
-            {
-                throw new Exception($"Unexpected token type {token.Type}");
-            }
-        }
-
-        private PdfScalarValue(string type, object? value)
-        {
-            _type = type;
-
-            _value = value;
-        }
-
-        public override object? GetValue() => _value;
-
-        public override string ToString()
-        {
-            if (Type == "name")
-            {
-                // names are not usually intended to be printed,
-                // but when they are, their encoding is supposed to be UTF8
-                if (_value is null)
-                {
-                    throw new Exception("Value cannot be null");
-                }
-                return ((StringValue)_value).ToString(Encoding.UTF8);
-            }
-            return base.ToString();
-        }
-
-        public override void Add(PdfObject pdfObject)
-        {
-            throw new Exception("Cannot nest scalar values");
-        }
-    }
-
     public class PdfIndirectObject : PdfRoot
     {
         private readonly ObjectIdentifier _objectIdentifier;
@@ -282,6 +202,86 @@ namespace MetadataExtractor.Formats.Pdf
         public override void Add(PdfObject pdfObject)
         {
             throw new Exception("Cannot nest within stream");
+        }
+    }
+
+    public class PdfScalarValue : PdfObject
+    {
+        private readonly string _type;
+
+        private readonly object? _value;
+
+        public override string Type => _type;
+
+        public static PdfScalarValue FromIndirectReference(uint objectNumber, ushort generation)
+        {
+            return new PdfScalarValue("indirect-reference", new ObjectIdentifier(objectNumber, generation));
+        }
+
+        public static PdfScalarValue FromIndirectReference(int objectNumber, int generation)
+        {
+            return new PdfScalarValue("indirect-reference", new ObjectIdentifier(objectNumber, generation));
+        }
+
+        public static PdfScalarValue FromToken(Token token)
+        {
+            if (token is NullToken)
+            {
+                return new PdfScalarValue("null", null);
+            }
+            else if (token is BooleanToken booleanToken)
+            {
+                return new PdfScalarValue("boolean", booleanToken.BooleanValue);
+            }
+            else if (token is NumericIntegerToken numericIntegerToken)
+            {
+                return new PdfScalarValue("numeric-integer", numericIntegerToken.IntegerValue);
+            }
+            else if (token is NumericRealToken numericRealToken)
+            {
+                return new PdfScalarValue("numeric-real", numericRealToken.RealValue);
+            }
+            else if (token is StringToken stringToken)
+            {
+                return new PdfScalarValue("string", stringToken.StringValue); // TODO encoding is context-specific
+            }
+            else if (token is NameToken nameToken)
+            {
+                return new PdfScalarValue("name", nameToken.StringValue);
+            }
+            else
+            {
+                throw new Exception($"Unexpected token type {token.Type}");
+            }
+        }
+
+        private PdfScalarValue(string type, object? value)
+        {
+            _type = type;
+
+            _value = value;
+        }
+
+        public override object? GetValue() => _value;
+
+        public override string ToString()
+        {
+            if (Type == "name")
+            {
+                // names are not usually intended to be printed,
+                // but when they are, their encoding is supposed to be UTF8
+                if (_value is null)
+                {
+                    throw new Exception("Value cannot be null");
+                }
+                return ((StringValue)_value).ToString(Encoding.UTF8);
+            }
+            return base.ToString();
+        }
+
+        public override void Add(PdfObject pdfObject)
+        {
+            throw new Exception("Cannot nest scalar values");
         }
     }
 }
