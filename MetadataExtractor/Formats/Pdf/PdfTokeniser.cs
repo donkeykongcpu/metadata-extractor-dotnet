@@ -1,10 +1,11 @@
 // Copyright (c) Drew Noakes and contributors. All Rights Reserved. Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
 using System;
+using System.Collections.Generic;
 
 namespace MetadataExtractor.Formats.Pdf
 {
-    internal class PdfTokeniser
+    public class PdfTokeniser
     {
         private static byte[] HeaderCommentBytes { get; } = Encoding.ASCII.GetBytes("PDF-");
 
@@ -22,9 +23,9 @@ namespace MetadataExtractor.Formats.Pdf
                 int currentIndex = _byteProvider.CurrentIndex;
 
                 if (MatchWhitespace()) continue;
-                else if (MatchToken("stream"))
+                else if (TryMatchStreamStart(out int streamStartIndex))
                 {
-                    yield return new StreamBeginToken(currentIndex);
+                    yield return new StreamBeginToken(startIndex: currentIndex, streamStartIndex: streamStartIndex);
                     yield break; // do not tokenise further, since the stream most likely contains invalid tokens
                 }
                 else if (MatchToken("R")) yield return new IndirectReferenceMarkerToken(currentIndex);
@@ -43,6 +44,41 @@ namespace MetadataExtractor.Formats.Pdf
                 else if (TryMatchName(out NameToken? nameToken)) yield return nameToken;
                 else if (TryMatchComment(out CommentToken? commentToken)) yield return commentToken;
                 else throw new Exception("Invalid character in input");
+            }
+        }
+
+        private bool TryMatchStreamStart(out int streamStartIndex)
+        {
+            // from the spec:
+            // The keyword stream that follows the stream dictionary shall be followed by an end-of-line marker
+            // consisting of either a CARRIAGE RETURN and a LINE FEED or just a LINE FEED, and not by a CARRIAGE
+            // RETURN alone. The sequence of bytes that make up a stream lie between the end-of-line marker following the
+            // stream keyword and the endstream keyword.
+            byte[] tokenBytes = Encoding.ASCII.GetBytes("stream");
+            for (int i = 0; i < tokenBytes.Length; i++)
+            {
+                if (tokenBytes[i] != _byteProvider.PeekNextItem(i))
+                {
+                    streamStartIndex = 0;
+                    return false;
+                }
+            }
+            if (_byteProvider.PeekNextItem(tokenBytes.Length) == (byte)'\r' && _byteProvider.PeekNextItem(tokenBytes.Length + 1) == (byte)'\n')
+            {
+                _byteProvider.Consume(tokenBytes.Length + 2);
+                streamStartIndex = _byteProvider.CurrentIndex;
+                return true;
+            }
+            else if (_byteProvider.PeekNextItem(tokenBytes.Length) == (byte)'\n')
+            {
+                _byteProvider.Consume(tokenBytes.Length + 1);
+                streamStartIndex = _byteProvider.CurrentIndex;
+                return true;
+            }
+            else
+            {
+                streamStartIndex = 0;
+                return false;
             }
         }
 

@@ -452,11 +452,13 @@ namespace MetadataExtractor.Tests.Formats.Pdf
         }
 
         [Fact]
-        public void TestBreakAtStreamMarker()
+        public void TestBreakAtStreamMarkerWithCRLF()
         {
-            string input = " <</Length 42>>stream $$$$$";
-            //              01234567890123456789012345678901234567
-            //              0         10        20        30
+            // the "stream" keyword must be followed by CRLF or LF, but not by CR alone
+
+            string input = " <</Length 42>>stream\r\n$$$$$";
+            //              0123456789012345678901 2 3
+            //              0         10        20
 
             Token[] actual = GetTokeniserForInput(input).Tokenise().ToArray();
 
@@ -466,7 +468,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                 CreateNameToken("Length", 3),
                 CreateNumericIntegerToken(42, 11),
                 new DictionaryEndToken(13),
-                new StreamBeginToken(15),
+                new StreamBeginToken(startIndex: 15, streamStartIndex: 23),
             };
 
             Assert.Equal(expected.Length, actual.Length);
@@ -474,7 +476,60 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             for (int i = 0; i < actual.Length; i++)
             {
                 Assert.Equal(expected[i], actual[i], new TokenEqualityComparer());
+
+                if (expected[i] is StreamBeginToken)
+                {
+                    Assert.Equal(((StreamBeginToken)expected[i]).StreamStartIndex, ((StreamBeginToken)actual[i]).StreamStartIndex);
+                }
             }
+        }
+
+        [Fact]
+        public void TestBreakAtStreamMarkerWithLF()
+        {
+            // the "stream" keyword must be followed by CRLF or LF, but not by CR alone
+
+            string input = " <</Length 42>>stream\n$$$$$";
+            //              0123456789012345678901 2
+            //              0         10        20
+
+            Token[] actual = GetTokeniserForInput(input).Tokenise().ToArray();
+
+            Token[] expected =
+            {
+                new DictionaryBeginToken(1),
+                CreateNameToken("Length", 3),
+                CreateNumericIntegerToken(42, 11),
+                new DictionaryEndToken(13),
+                new StreamBeginToken(startIndex: 15, streamStartIndex: 22),
+            };
+
+            Assert.Equal(expected.Length, actual.Length);
+
+            for (int i = 0; i < actual.Length; i++)
+            {
+                Assert.Equal(expected[i], actual[i], new TokenEqualityComparer());
+
+                if (expected[i] is StreamBeginToken)
+                {
+                    Assert.Equal(((StreamBeginToken)expected[i]).StreamStartIndex, ((StreamBeginToken)actual[i]).StreamStartIndex);
+                }
+            }
+        }
+
+        [Fact]
+        public void TestBreakAtStreamMarkerWithCR()
+        {
+            // the "stream" keyword must be followed by CRLF or LF, but not by CR alone
+
+            string input = " <</Length 42>>stream\r$$$$$";
+            //              0123456789012345678901 2
+            //              0         10        20
+
+            Assert.ThrowsAny<Exception>(() =>
+            {
+                _ = GetTokeniserForInput(input).Tokenise().ToArray();
+            });
         }
 
         [Fact]
@@ -546,8 +601,8 @@ namespace MetadataExtractor.Tests.Formats.Pdf
         [Fact]
         public void TestDictionaryFromSampleFile()
         {
-            string input = " 699 0 obj<</First 700 0 R/Count 13/Last 701 0 R>>endobj\r\n1129 0 obj\r\n<</Subtype/XML/Length 3649/Type/Metadata>>stream";
-            //              012345678901234567890123456789012345678901234567890123456 7 89012345678 9 01234567890123456789012345678901234567890123456
+            string input = " 699 0 obj<</First 700 0 R/Count 13/Last 701 0 R>>endobj\r\n1129 0 obj\r\n<</Subtype/XML/Length 3649/Type/Metadata>>";
+            //              012345678901234567890123456789012345678901234567890123456 7 89012345678 9 01234567890123456789012345678901234567890
             //              0         10        20        30        40        50          60          70        80        90        100       110
 
             Token[] actual = GetTokeniserForInput(input).Tokenise().ToArray();
@@ -581,7 +636,6 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                 CreateNameToken("Type", 96),
                 CreateNameToken("Metadata", 101),
                 new DictionaryEndToken(110),
-                new StreamBeginToken(112),
             };
 
             Assert.Equal(expected.Length, actual.Length);

@@ -55,8 +55,14 @@ namespace MetadataExtractor.Formats.Pdf
 
     public class StreamBeginToken : Token
     {
+        public int StreamStartIndex { get; }
+
         public override string Type => "stream";
-        public StreamBeginToken(int startIndex) : base("stream", startIndex) { }
+
+        public StreamBeginToken(int startIndex, int streamStartIndex) : base("stream", startIndex)
+        {
+            StreamStartIndex = streamStartIndex;
+        }
     }
 
     public class NullToken : Token
