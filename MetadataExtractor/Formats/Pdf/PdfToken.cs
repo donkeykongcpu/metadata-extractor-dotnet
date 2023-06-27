@@ -4,7 +4,7 @@ using System;
 
 namespace MetadataExtractor.Formats.Pdf
 {
-    public abstract class Token : IEquatable<Token>
+    public abstract class Token
     {
         public abstract string Type { get; }
 
@@ -26,13 +26,6 @@ namespace MetadataExtractor.Formats.Pdf
             Value = value.ToCharArray().Select(x => (byte)x).ToArray();
 
             StartIndex = startIndex;
-        }
-
-        public bool Equals(Token other)
-        {
-            if (other is null) return false;
-            if (other.Type != Type) return false;
-            return Value.EqualTo(other.Value);
         }
     }
 

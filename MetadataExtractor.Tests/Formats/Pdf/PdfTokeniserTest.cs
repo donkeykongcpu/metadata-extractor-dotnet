@@ -154,6 +154,27 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             return tokeniser;
         }
 
+        private class TokenEqualityComparer : IEqualityComparer<Token>
+        {
+            public bool Equals(Token? token1, Token? token2)
+            {
+                if (ReferenceEquals(token1, token2))
+                {
+                    return true;
+                }
+
+                if (token1 is null || token2 is null)
+                {
+                    return false;
+                }
+
+                return token1.Type == token2.Type
+                    && token1.StartIndex == token2.StartIndex
+                    && token1.Value.EqualTo(token2.Value);
+            }
+
+            public int GetHashCode(Token token) => token.Value.GetHashCode();
+        }
 
         [Fact]
         public void TestLiteralStrings()
@@ -168,9 +189,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
                 for (int i = 0; i < actual.Length; i++)
                 {
-                    Assert.True(expected[i].Equals(actual[i]));
-
-                    Assert.Equal(expected[i].StartIndex, actual[i].StartIndex);
+                    Assert.Equal(expected[i], actual[i], new TokenEqualityComparer());
                 }
             }
         }
@@ -188,9 +207,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
                 for (int i = 0; i < actual.Length; i++)
                 {
-                    Assert.True(expected[i].Equals(actual[i]));
-
-                    Assert.Equal(expected[i].StartIndex, actual[i].StartIndex);
+                    Assert.Equal(expected[i], actual[i], new TokenEqualityComparer());
                 }
             }
         }
@@ -208,9 +225,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
                 for (int i = 0; i < actual.Length; i++)
                 {
-                    Assert.True(expected[i].Equals(actual[i]));
-
-                    Assert.Equal(expected[i].StartIndex, actual[i].StartIndex);
+                    Assert.Equal(expected[i], actual[i], new TokenEqualityComparer());
                 }
             }
         }
@@ -228,9 +243,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
                 for (int i = 0; i < actual.Length; i++)
                 {
-                    Assert.True(expected[i].Equals(actual[i]));
-
-                    Assert.Equal(expected[i].StartIndex, actual[i].StartIndex);
+                    Assert.Equal(expected[i], actual[i], new TokenEqualityComparer());
                 }
             }
         }
@@ -252,9 +265,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
                 for (int i = 0; i < actual.Length; i++)
                 {
-                    Assert.True(expected[i].Equals(headerTokens[i]));
-
-                    Assert.Equal(expected[i].StartIndex, headerTokens[i].StartIndex);
+                    Assert.Equal(expected[i], headerTokens[i], new TokenEqualityComparer());
 
                     Assert.Equal(expected[i].Version, headerTokens[i].Version);
 
@@ -414,9 +425,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             for (int i = 0; i < actual.Length; i++)
             {
-                Assert.True(expected[i].Equals(actual[i]));
-
-                Assert.Equal(expected[i].StartIndex, actual[i].StartIndex);
+                Assert.Equal(expected[i], actual[i], new TokenEqualityComparer());
             }
         }
 
@@ -442,9 +451,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             for (int i = 0; i < actual.Length; i++)
             {
-                Assert.True(expected[i].Equals(actual[i]));
-
-                Assert.Equal(expected[i].StartIndex, actual[i].StartIndex);
+                Assert.Equal(expected[i], actual[i], new TokenEqualityComparer());
             }
         }
 
@@ -476,9 +483,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             for (int i = 0; i < actual.Length; i++)
             {
-                Assert.True(expected[i].Equals(actual[i]));
-
-                Assert.Equal(expected[i].StartIndex, actual[i].StartIndex);
+                Assert.Equal(expected[i], actual[i], new TokenEqualityComparer());
             }
         }
 
@@ -512,9 +517,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             for (int i = 0; i < actual.Length; i++)
             {
-                Assert.True(expected[i].Equals(actual[i]));
-
-                Assert.Equal(expected[i].StartIndex, actual[i].StartIndex);
+                Assert.Equal(expected[i], actual[i], new TokenEqualityComparer());
             }
         }
 
@@ -563,9 +566,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             for (int i = 0; i < actual.Length; i++)
             {
-                Assert.True(expected[i].Equals(actual[i]));
-
-                Assert.Equal(expected[i].StartIndex, actual[i].StartIndex);
+                Assert.Equal(expected[i], actual[i], new TokenEqualityComparer());
             }
         }
 
@@ -615,9 +616,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             for (int i = 0; i < actual.Length; i++)
             {
-                Assert.True(expected[i].Equals(actual[i]));
-
-                Assert.Equal(expected[i].StartIndex, actual[i].StartIndex);
+                Assert.Equal(expected[i], actual[i], new TokenEqualityComparer());
             }
         }
 
