@@ -275,6 +275,28 @@ namespace MetadataExtractor.Tests.Formats.Pdf
         }
 
         [Fact]
+        public void TestInterspersedComments()
+        {
+            Token[] actual = GetTokeniserForInput("(abc)% comment ( /%) blah blah blah\r\n123").Tokenise().ToArray();
+            //                                     012345678901234567890123456789012345 6 789
+            //                                     0         10        20        30
+
+            Token[] expected = new Token[]
+            {
+                CreateStringToken("abc", 0),
+                CreateCommentToken(" comment ( /%) blah blah blah", 5),
+                CreateNumericIntegerToken(123, 37),
+            };
+
+            Assert.Equal(expected.Length, actual.Length);
+
+            for (int i = 0; i < actual.Length; i++)
+            {
+                Assert.Equal(expected[i], actual[i], new TokenEqualityComparer());
+            }
+        }
+
+        [Fact]
         public void TestBinaryIndicatorComment()
         {
             string input = " %\u00E2\u00E3\u00CF\u00D3\r\n";
