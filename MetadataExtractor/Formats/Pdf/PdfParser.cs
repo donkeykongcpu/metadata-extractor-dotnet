@@ -8,29 +8,63 @@ namespace MetadataExtractor.Formats.Pdf
     {
         private class ParseContext
         {
-            private readonly Stack<PdfObject> _stack;
+            private readonly Stack<IPdfContainer> _stack;
 
             public bool IsRoot => _stack.Peek().Type == "root";
-
-            public bool IsIndirectObject => _stack.Peek().Type == "indirect-object";
 
             private string ContextType => _stack.Peek().Type;
 
             public ParseContext()
             {
-                _stack = new Stack<PdfObject>();
+                _stack = new Stack<IPdfContainer>();
                 _stack.Push(new PdfRoot()); // make sure stack is never empty
             }
 
-            public void Add(PdfObject pdfObject)
+            private void AddScalarObject<T>(PdfScalarObject<T> scalarObject)
             {
-                _stack.Peek().Add(pdfObject);
+                _stack.Peek().Add(scalarObject);
             }
 
-            public void StartContext(PdfObject pdfObject)
+            public void AddToken(NullToken _)
             {
-                Add(pdfObject);
-                _stack.Push(pdfObject);
+                _stack.Peek().Add(new PdfNull());
+            }
+
+            public void AddToken(BooleanToken token)
+            {
+                AddScalarObject(new PdfBoolean(token.BooleanValue));
+            }
+
+            public void AddToken(NumericIntegerToken token)
+            {
+                AddScalarObject(new PdfNumericInteger(token.IntegerValue));
+            }
+
+            public void AddToken(NumericRealToken token)
+            {
+                AddScalarObject(new PdfNumericReal(token.RealValue));
+            }
+
+            public void AddToken(StringToken token)
+            {
+                AddScalarObject(new PdfString(token.StringValue));
+            }
+
+            public void AddToken(NameToken token)
+            {
+                AddScalarObject(new PdfName(token.StringValue));
+            }
+
+            public void AddIndirectReference(NumericIntegerToken objectNumberToken, NumericIntegerToken generationNumberToken)
+            {
+                ObjectIdentifier objectIdentifier = new ObjectIdentifier(objectNumberToken.IntegerValue, generationNumberToken.IntegerValue);
+                AddScalarObject(new PdfIndirectReference(objectIdentifier));
+            }
+
+            public void StartContext<T>(PdfContainer<T> pdfContainer)
+            {
+                _stack.Peek().Nest(pdfContainer);
+                _stack.Push(pdfContainer);
             }
 
             public void EndContext(string type)
@@ -43,11 +77,11 @@ namespace MetadataExtractor.Formats.Pdf
                 Debug.Assert(_stack.Count > 0);
             }
 
-            public PdfObject GetIndirectObjectValue()
+            public PdfIndirectObject GetIndirectObject()
             {
                 if (_stack.Peek() is PdfIndirectObject pdfIndirectObject)
                 {
-                    return pdfIndirectObject.GetRootValue(); // a PdfObject
+                    return pdfIndirectObject;
                 }
                 else
                 {
@@ -59,7 +93,7 @@ namespace MetadataExtractor.Formats.Pdf
             {
                 if (_stack.Peek() is PdfIndirectObject pdfIndirectObject)
                 {
-                    pdfIndirectObject.SetRootValue(pdfStream);
+                    pdfIndirectObject.ReplaceValue(pdfStream);
                 }
                 else
                 {
@@ -75,7 +109,7 @@ namespace MetadataExtractor.Formats.Pdf
                 }
                 if (_stack.Peek() is PdfRoot pdfRoot)
                 {
-                    return pdfRoot.GetRootValue(); // a PdfObject
+                    return pdfRoot.Value;
                 }
                 else
                 {
@@ -127,38 +161,34 @@ namespace MetadataExtractor.Formats.Pdf
             {
                 var nextToken = tokenProvider.GetNextItem();
 
-                // first check if we have either an indirect object (objectNumber generation "obj" ... "endobj")
-                // or an indirect reference to an object (objectNumber generation "R")
+                // first check if we have either an indirect object (objectNumber generationNumber "obj" ... "endobj")
+                // or an indirect reference to an object (objectNumber generationNumber "R")
                 // (which spans 3 tokens)
 
                 if (nextToken is NumericIntegerToken objectNumberToken
-                    && tokenProvider.PeekNextItem(0) is NumericIntegerToken generationToken
+                    && tokenProvider.PeekNextItem(0) is NumericIntegerToken generationNumberToken
                     && tokenProvider.PeekNextItem(1) is (IndirectObjectBeginToken or IndirectReferenceMarkerToken)
                     )
                 {
                     if (tokenProvider.PeekNextItem(1) is IndirectObjectBeginToken)
                     {
-                        parseContext.StartContext(new PdfIndirectObject(objectNumberToken.IntegerValue, generationToken.IntegerValue));
+                        parseContext.StartContext(new PdfIndirectObject(objectNumberToken.IntegerValue, generationNumberToken.IntegerValue));
                     }
                     else
                     {
-                        parseContext.Add(PdfScalarValue.FromIndirectReference(objectNumberToken.IntegerValue, generationToken.IntegerValue));
+                        parseContext.AddIndirectReference(objectNumberToken, generationNumberToken);
                     }
                     tokenProvider.Consume(2);
                 }
                 else if (nextToken is StreamBeginToken streamBeginToken)
                 {
                     // all stream objects are indirect objects, so we must be within an "indirect-object" context
-                    if (!parseContext.IsIndirectObject)
-                    {
-                        throw new Exception("Invalid context type for stream");
-                    }
+                    PdfIndirectObject indirectObject = parseContext.GetIndirectObject();
                     // the current value of the indirect object context must be a dictionary, which represents the stream dictionary
-                    object? indirectObjectValue = parseContext.GetIndirectObjectValue();
                     // create a PDF stream with this dictionary as stream dictionary, then replace the value of the indirect object context with it
-                    if (indirectObjectValue is PdfDictionary streamDictionary)
+                    if (indirectObject.Value is PdfDictionary streamDictionary)
                     {
-                        PdfStream pdfStream = new PdfStream(streamDictionary, streamBeginToken.StreamStartIndex);
+                        PdfStream pdfStream = new PdfStream(indirectObject.Identifier, streamDictionary, streamBeginToken.StreamStartIndex);
                         parseContext.ReplaceIndirectObjectValue(pdfStream);
                     }
                     else
@@ -190,9 +220,33 @@ namespace MetadataExtractor.Formats.Pdf
                 {
                     continue; // ignore comments
                 }
+                else if (nextToken is NullToken nullToken)
+                {
+                    parseContext.AddToken(nullToken);
+                }
+                else if (nextToken is BooleanToken booleanToken)
+                {
+                    parseContext.AddToken(booleanToken);
+                }
+                else if (nextToken is NumericIntegerToken numericIntegerToken)
+                {
+                    parseContext.AddToken(numericIntegerToken);
+                }
+                else if (nextToken is NumericRealToken numericRealToken)
+                {
+                    parseContext.AddToken(numericRealToken);
+                }
+                else if (nextToken is StringToken stringToken)
+                {
+                    parseContext.AddToken(stringToken);
+                }
+                else if (nextToken is NameToken nameToken)
+                {
+                    parseContext.AddToken(nameToken);
+                }
                 else
                 {
-                    parseContext.Add(PdfScalarValue.FromToken(nextToken));
+                    throw new Exception("Unknown token");
                 }
 
                 if (parseContext.IsRoot)

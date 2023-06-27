@@ -166,16 +166,6 @@ namespace MetadataExtractor.Formats.Pdf
         {
             return Encoding.ASCII.GetString(Value); // TODO encoding is context-specific
         }
-
-        public string ToASCIIString()
-        {
-            return Encoding.ASCII.GetString(Value);
-        }
-
-        public string ToUTF8String()
-        {
-            return Encoding.UTF8.GetString(Value);
-        }
     }
 
     public class NameToken : Token

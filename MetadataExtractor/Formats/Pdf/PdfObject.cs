@@ -6,169 +6,107 @@ namespace MetadataExtractor.Formats.Pdf
 {
     public abstract class PdfObject
     {
+    }
+
+    public interface IPdfContainer
+    {
         public abstract string Type { get; }
 
-        public abstract object? GetValue();
+        void Nest<T>(PdfContainer<T> pdfContainer);
+
+        void Add(PdfObject pdfObject);
+    }
+
+    public abstract class PdfContainer<T> : PdfObject, IPdfContainer
+    {
+        public abstract string Type { get; }
+
+        public abstract T Value { get; }
+
+        public void Nest<U>(PdfContainer<U> pdfContainer)
+        {
+            Add(pdfContainer);
+        }
 
         public abstract void Add(PdfObject pdfObject);
     }
 
-    public class PdfRoot : PdfObject
+    public abstract class PdfScalarObject<T> : PdfObject
     {
-        private PdfObject? _rootValue;
+        public abstract T Value { get; }
+    }
 
-        public override string Type => "root";
+    #region Scalar objects
 
-        public PdfRoot()
+    public class PdfNull : PdfObject
+    {
+    }
+
+    public class PdfBoolean : PdfScalarObject<bool>
+    {
+        public override bool Value { get; }
+
+        public PdfBoolean(bool value)
         {
-            _rootValue = null;
-        }
-
-        public override object? GetValue()
-        {
-            if (_rootValue is null)
-            {
-                throw new Exception("Value was not set");
-            }
-            return _rootValue;
-        }
-
-        public PdfObject GetRootValue()
-        {
-            if (_rootValue is null)
-            {
-                throw new Exception("Value was not set");
-            }
-            return _rootValue;
-        }
-
-        public void SetRootValue(PdfObject pdfObject)
-        {
-            _rootValue = pdfObject;
-        }
-
-        public override void Add(PdfObject pdfObject)
-        {
-            if (_rootValue is not null)
-            {
-                throw new Exception("Value already set");
-            }
-            _rootValue = pdfObject;
+            Value = value;
         }
     }
 
-    public class PdfIndirectObject : PdfRoot
+    public class PdfNumericInteger : PdfScalarObject<int>
     {
-        private readonly ObjectIdentifier _objectIdentifier;
+        public override int Value { get; }
 
-        public override string Type => "indirect-object";
-
-        public uint ObjectNumber => _objectIdentifier.ObjectNumber;
-
-        public ushort Generation => _objectIdentifier.Generation;
-
-        public PdfIndirectObject(uint objectNumber, ushort generation)
-            : base()
+        public PdfNumericInteger(int value)
         {
-            _objectIdentifier = new ObjectIdentifier(objectNumber, generation);
-        }
-
-        public PdfIndirectObject(int objectNumber, int generation)
-            : base()
-        {
-            _objectIdentifier = new ObjectIdentifier(objectNumber, generation);
+            Value = value;
         }
     }
 
-    public class PdfArray : PdfObject
+    public class PdfNumericReal : PdfScalarObject<decimal>
     {
-        private readonly List<PdfObject> _array;
+        public override decimal Value { get; }
 
-        public override string Type => "array";
-
-        public PdfArray()
+        public PdfNumericReal(decimal value)
         {
-            _array = new List<PdfObject>();
-        }
-
-        public PdfArray(IEnumerable<PdfObject> values)
-        {
-            _array = new List<PdfObject>(values);
-        }
-
-        public override object? GetValue()
-        {
-            return _array;
-        }
-
-        public override void Add(PdfObject pdfObject)
-        {
-            _array.Add(pdfObject);
+            Value = value;
         }
     }
 
-    public class PdfDictionary : PdfObject
+    public class PdfString : PdfScalarObject<StringValue>
     {
-        private readonly Dictionary<string, PdfObject> _dictionary;
+        public override StringValue Value { get; }
 
-        private string? _currentKey = null;
-
-        public override string Type => "dictionary";
-
-        public PdfDictionary()
+        public PdfString(StringValue value)
         {
-            _dictionary = new Dictionary<string, PdfObject>();
+            Value = value;
         }
 
-        public PdfDictionary(IDictionary<string, PdfObject> values)
+        public string ToASCIIString()
         {
-            _dictionary = new Dictionary<string, PdfObject>(values);
+            return Value.ToString(Encoding.ASCII);
         }
 
-        public override object? GetValue()
+        public string ToUTF8String()
         {
-            return _dictionary;
+            return Value.ToString(Encoding.UTF8);
         }
+    }
 
-        public override void Add(PdfObject pdfObject)
+    public class PdfName : PdfString
+    {
+        public PdfName(StringValue value)
+            : base(value)
         {
-            if (pdfObject.Type == "name")
-            {
-                if (_currentKey is not null)
-                {
-                    _dictionary.Add(_currentKey, pdfObject); // names can be values, too, in which case their encoding is probably UTF8
-                    _currentKey = null;
-                }
-                else
-                {
-                    _currentKey = pdfObject.ToString(); // documented dictionary keys are probably ASCII
-                }
-            }
-            else
-            {
-                if (_currentKey is null)
-                {
-                    return;
-                }
-                if (pdfObject.Type != "null")
-                {
-                    _dictionary.Add(_currentKey, pdfObject);
-                }
-                _currentKey = null;
-            }
         }
+    }
 
-        public int GetNumericIntegerForKey(string key)
+    public class PdfIndirectReference : PdfScalarObject<ObjectIdentifier>
+    {
+        public override ObjectIdentifier Value { get; }
+
+        public PdfIndirectReference(ObjectIdentifier value)
         {
-            PdfObject value = _dictionary[key];
-            if (value is PdfScalarValue scalarValue && scalarValue.Type == "numeric-integer")
-            {
-                return Convert.ToInt32(value.GetValue());
-            }
-            else
-            {
-                throw new Exception($"Value for key {key} is not a numeric integer");
-            }
+            Value = value;
         }
     }
 
@@ -177,7 +115,7 @@ namespace MetadataExtractor.Formats.Pdf
         // from the spec:
         // All streams shall be indirect objects and the stream dictionary shall be a direct object
 
-        public override string Type => "stream";
+        public ObjectIdentifier Identifier { get; }
 
         public PdfDictionary StreamDictionary { get; }
 
@@ -185,103 +123,155 @@ namespace MetadataExtractor.Formats.Pdf
 
         public int StreamLength { get; }
 
-        public PdfStream(PdfDictionary streamDictionary, int streamStartIndex)
+        public PdfStream(ObjectIdentifier identifier, PdfDictionary streamDictionary, int streamStartIndex)
         {
+            Identifier = identifier;
+
             StreamDictionary = streamDictionary;
 
             StreamStartIndex = streamStartIndex;
 
             StreamLength = streamDictionary.GetNumericIntegerForKey("Length");
         }
+    }
 
-        public override object? GetValue()
+    #endregion Scalar objects
+
+    #region Containers
+
+    public class PdfRoot : PdfContainer<PdfObject>
+    {
+        private PdfObject? _value;
+
+        public override PdfObject Value
         {
-            return StreamDictionary;
+            get
+            {
+                if (_value is null)
+                {
+                    throw new Exception("Value was not set"); // TODO: getters are not supposed to throw
+                }
+                return _value;
+            }
+        }
+
+        public override string Type => "root";
+
+        public ObjectIdentifier Identifier { get; }
+
+        public PdfRoot()
+        {
+            _value = null;
         }
 
         public override void Add(PdfObject pdfObject)
         {
-            throw new Exception("Cannot nest within stream");
+            if (_value is not null)
+            {
+                throw new Exception("Value already set");
+            }
+            _value = pdfObject;
+        }
+
+        public void ReplaceValue(PdfObject pdfObject)
+        {
+            _value = pdfObject;
         }
     }
 
-    public class PdfScalarValue : PdfObject
+    public class PdfIndirectObject : PdfRoot
     {
-        private readonly string _type;
+        public override string Type => "indirect-object";
 
-        private readonly object? _value;
+        public ObjectIdentifier Identifier { get; }
 
-        public override string Type => _type;
-
-        public static PdfScalarValue FromIndirectReference(uint objectNumber, ushort generation)
+        public PdfIndirectObject(uint objectNumber, ushort generationNumber)
+         : base()
         {
-            return new PdfScalarValue("indirect-reference", new ObjectIdentifier(objectNumber, generation));
+            Identifier = new ObjectIdentifier(objectNumber, generationNumber);
         }
 
-        public static PdfScalarValue FromIndirectReference(int objectNumber, int generation)
+        public PdfIndirectObject(int objectNumber, int generationNumber)
+            : base()
         {
-            return new PdfScalarValue("indirect-reference", new ObjectIdentifier(objectNumber, generation));
+            Identifier = new ObjectIdentifier(objectNumber, generationNumber);
+        }
+    }
+
+    public class PdfArray : PdfContainer<List<PdfObject>>
+    {
+        public override List<PdfObject> Value { get; }
+
+        public override string Type => "array";
+
+        public PdfArray()
+        {
+            Value = new List<PdfObject>();
         }
 
-        public static PdfScalarValue FromToken(Token token)
+        public PdfArray(IEnumerable<PdfObject> values)
         {
-            if (token is NullToken)
+            Value = new List<PdfObject>(values);
+        }
+
+        public override void Add(PdfObject pdfObject)
+        {
+            Value.Add(pdfObject);
+        }
+    }
+
+    public class PdfDictionary : PdfContainer<Dictionary<string, PdfObject>>
+    {
+        public override Dictionary<string, PdfObject> Value { get; }
+
+        private string? _currentKey = null;
+
+        public override string Type => "dictionary";
+
+        public PdfDictionary()
+        {
+            Value = new Dictionary<string, PdfObject>();
+        }
+
+        public PdfDictionary(IDictionary<string, PdfObject> values)
+        {
+            Value = new Dictionary<string, PdfObject>(values);
+        }
+
+        public override void Add(PdfObject pdfObject)
+        {
+            if (pdfObject is PdfName name)
             {
-                return new PdfScalarValue("null", null);
-            }
-            else if (token is BooleanToken booleanToken)
-            {
-                return new PdfScalarValue("boolean", booleanToken.BooleanValue);
-            }
-            else if (token is NumericIntegerToken numericIntegerToken)
-            {
-                return new PdfScalarValue("numeric-integer", numericIntegerToken.IntegerValue);
-            }
-            else if (token is NumericRealToken numericRealToken)
-            {
-                return new PdfScalarValue("numeric-real", numericRealToken.RealValue);
-            }
-            else if (token is StringToken stringToken)
-            {
-                return new PdfScalarValue("string", stringToken.StringValue); // TODO encoding is context-specific
-            }
-            else if (token is NameToken nameToken)
-            {
-                return new PdfScalarValue("name", nameToken.StringValue);
+                if (_currentKey is not null)
+                {
+                    Value.Add(_currentKey, pdfObject); // names can be values, too, in which case their encoding is probably UTF8
+                    _currentKey = null;
+                }
+                else
+                {
+                    _currentKey = name.ToASCIIString(); // documented dictionary keys are probably ASCII
+                }
             }
             else
             {
-                throw new Exception($"Unexpected token type {token.Type}");
-            }
-        }
-
-        private PdfScalarValue(string type, object? value)
-        {
-            _type = type;
-
-            _value = value;
-        }
-
-        public override object? GetValue() => _value;
-
-        public override string ToString()
-        {
-            if (Type == "name")
-            {
-                // names are not usually intended to be printed,
-                // but when they are, their encoding is supposed to be UTF8
-                if (_value is null)
+                if (_currentKey is null)
                 {
-                    throw new Exception("Value cannot be null");
+                    return;
                 }
-                return ((StringValue)_value).ToString(Encoding.UTF8);
+                if (pdfObject is not PdfNull)
+                {
+                    Value.Add(_currentKey, pdfObject);
+                }
+                _currentKey = null;
             }
-            return base.ToString();
         }
 
-        public override void Add(PdfObject pdfObject)
+        public int GetNumericIntegerForKey(string key)
         {
-            throw new Exception("Cannot nest scalar values");
+            if (Value[key] is PdfNumericInteger numericInteger) return numericInteger.Value;
+            else throw new Exception($"Value for key {key} is not a numeric integer");
         }
     }
+
+    #endregion Containers
 }
