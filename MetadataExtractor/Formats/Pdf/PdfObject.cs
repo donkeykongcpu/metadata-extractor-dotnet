@@ -132,36 +132,26 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
-    public class PdfIndirectObject : PdfObject
+    public class PdfIndirectObject : PdfRoot
     {
-        private object? _value;
-
-        private bool _valueWasSet;
+        private readonly IndirectReference _indirectReference;
 
         public override string Type => "indirect-object";
 
-        public PdfIndirectObject()
+        public uint ObjectNumber => _indirectReference.ObjectNumber;
+
+        public ushort Generation => _indirectReference.Generation;
+
+        public PdfIndirectObject(uint objectNumber, ushort generation)
+            : base()
         {
-            _valueWasSet = false;
+            _indirectReference = new IndirectReference(objectNumber, generation);
         }
 
-        public override object? GetValue()
+        public PdfIndirectObject(int objectNumber, int generation)
+            : base()
         {
-            if (!_valueWasSet)
-            {
-                throw new Exception("Value was not set");
-            }
-            return _value;
-        }
-
-        public override void Add(PdfObject pdfObject)
-        {
-            if (_valueWasSet)
-            {
-                throw new Exception("Value already set");
-            }
-            _value = pdfObject;
-            _valueWasSet = true;
+            _indirectReference = new IndirectReference(objectNumber, generation);
         }
     }
 

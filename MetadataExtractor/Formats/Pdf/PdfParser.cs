@@ -25,17 +25,8 @@ namespace MetadataExtractor.Formats.Pdf
                 _stack.Peek().Add(pdfObject);
             }
 
-            public void StartContext(string type)
+            public void StartContext(PdfObject pdfObject)
             {
-                PdfObject pdfObject;
-                switch (type)
-                {
-                    case "root": throw new Exception("Cannot start root context");
-                    case "indirect-object": pdfObject = new PdfIndirectObject(); break;
-                    case "array": pdfObject = new PdfArray(); break;
-                    case "dictionary": pdfObject = new PdfDictionary(); break;
-                    default: throw new Exception("Invalid type");
-                }
                 Add(pdfObject);
                 _stack.Push(pdfObject);
             }
@@ -47,10 +38,7 @@ namespace MetadataExtractor.Formats.Pdf
                     throw new Exception("Context type mismatch");
                 }
                 _stack.Pop();
-                if (_stack.Count < 1)
-                {
-                    throw new Exception("Context underflow");
-                }
+                Debug.Assert(_stack.Count > 0);
             }
 
             public PdfObject GetValue()
@@ -117,25 +105,24 @@ namespace MetadataExtractor.Formats.Pdf
                 // or an indirect reference to an object (objectNumber generation "R")
                 // (which spans 3 tokens)
 
-                if (nextToken is NumericIntegerToken
-                    && tokenProvider.PeekNextItem(0) is NumericIntegerToken
-                    && tokenProvider.PeekNextItem(1) is IndirectObjectBeginToken
-                    )
-                {
-                    tokenProvider.Consume(2);
-                    parseContext.StartContext("indirect-object");
-                }
-                else if (nextToken is NumericIntegerToken objectNumberToken
+                if (nextToken is NumericIntegerToken objectNumberToken
                     && tokenProvider.PeekNextItem(0) is NumericIntegerToken generationToken
-                    && tokenProvider.PeekNextItem(1) is IndirectReferenceMarkerToken
+                    && tokenProvider.PeekNextItem(1) is (IndirectObjectBeginToken or IndirectReferenceMarkerToken)
                     )
                 {
+                    if (tokenProvider.PeekNextItem(1) is IndirectObjectBeginToken)
+                    {
+                        parseContext.StartContext(new PdfIndirectObject(objectNumberToken.IntegerValue, generationToken.IntegerValue));
+                    }
+                    else
+                    {
+                        parseContext.Add(PdfScalarValue.FromIndirectReference(objectNumberToken.IntegerValue, generationToken.IntegerValue));
+                    }
                     tokenProvider.Consume(2);
-                    parseContext.Add(PdfScalarValue.FromIndirectReference(objectNumberToken.IntegerValue, generationToken.IntegerValue));
                 }
                 else if (nextToken is ArrayBeginToken)
                 {
-                    parseContext.StartContext("array");
+                    parseContext.StartContext(new PdfArray());
                 }
                 else if (nextToken is ArrayEndToken)
                 {
@@ -143,7 +130,7 @@ namespace MetadataExtractor.Formats.Pdf
                 }
                 else if (nextToken is DictionaryBeginToken)
                 {
-                    parseContext.StartContext("dictionary");
+                    parseContext.StartContext(new PdfDictionary());
                 }
                 else if (nextToken is DictionaryEndToken)
                 {

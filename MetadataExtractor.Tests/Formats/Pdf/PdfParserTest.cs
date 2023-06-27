@@ -70,8 +70,10 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                         Dictionary<string, PdfObject> dictionary2 = (Dictionary<string, PdfObject>)value2;
                         return dictionary1.Keys.Count == dictionary2.Keys.Count
                             && dictionary1.All(item => dictionary2.ContainsKey(item.Key) && Equals(item.Value, dictionary2[item.Key]));
-
-                    //case "XXX": return XXX;
+                    case "indirect-object":
+                        return ((PdfIndirectObject)object1).ObjectNumber == ((PdfIndirectObject)object2).ObjectNumber
+                            && ((PdfIndirectObject)object1).Generation == ((PdfIndirectObject)object2).Generation
+                            && Equals((PdfObject)value1, (PdfObject)value2);
                     //case "XXX": return XXX;
                     default: throw new Exception($"Unknown object type: {object1.Type}");
                 }
@@ -325,7 +327,37 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
         }
 
+        [Fact]
+        public void TestIndirectObjects()
+        {
+            List<Token> tokens = new List<Token>
+            {
+                new NumericIntegerToken(123, new byte[] { (byte)'1', (byte)'2', (byte)'3' }, 1),
+                new NumericIntegerToken(456, new byte[] { (byte)'4', (byte)'5', (byte)'6' }, 2),
+                new IndirectObjectBeginToken(3),
 
+                new DictionaryBeginToken(10),
+                new NameToken(new byte[] { (byte)'K', (byte)'e', (byte)'y', (byte)'1' }, 11),
+                new NumericIntegerToken(789, new byte[] { (byte)'7', (byte)'8', (byte)'9' }, 12),
+                new NameToken(new byte[] { (byte)'K', (byte)'e', (byte)'y', (byte)'2' }, 13),
+                new BooleanToken(true, 14),
+                new DictionaryEndToken(15),
+
+                new IndirectObjectEndToken(20),
+            };
+
+            PdfObject actual = ParseTokens(tokens);
+
+            PdfObject expected = new PdfIndirectObject(123, 456);
+
+            expected.Add(new PdfDictionary(new Dictionary<string, PdfObject>
+            {
+                { "Key1", PdfScalarValue.FromToken(new NumericIntegerToken(789, new byte[] { (byte)'7', (byte)'8', (byte)'9' }, 12)) },
+                { "Key2", PdfScalarValue.FromToken(new BooleanToken(true, 14)) },
+            }));
+
+            Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
+        }
 
 
 
