@@ -405,6 +405,80 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
         }
 
+        [Fact]
+        public void TestMissingStreamDictionary()
+        {
+            List<Token> tokens = new List<Token>
+            {
+                new NumericIntegerToken(123, new byte[] { (byte)'1', (byte)'2', (byte)'3' }, 1),
+                new NumericIntegerToken(456, new byte[] { (byte)'4', (byte)'5', (byte)'6' }, 2),
+                new IndirectObjectBeginToken(3),
+
+                new StreamBeginToken(startIndex: 20, streamStartIndex: 22),
+
+                new IndirectObjectEndToken(30),
+            };
+
+            Assert.ThrowsAny<Exception>(() =>
+            {
+                _ = ParseTokens(tokens);
+            });
+        }
+
+        [Fact]
+        public void TestInvalidStreamDictionary()
+        {
+            // Length key is missing from stream dictionary
+
+            List<Token> tokens = new List<Token>
+            {
+                new NumericIntegerToken(123, new byte[] { (byte)'1', (byte)'2', (byte)'3' }, 1),
+                new NumericIntegerToken(456, new byte[] { (byte)'4', (byte)'5', (byte)'6' }, 2),
+                new IndirectObjectBeginToken(3),
+
+                new DictionaryBeginToken(10),
+                new NameToken(new byte[] { (byte)'D', (byte)'L' }, 11),
+                new NumericIntegerToken(17, new byte[] { (byte)'1', (byte)'7' }, 12),
+                new DictionaryEndToken(13),
+
+                new StreamBeginToken(startIndex: 20, streamStartIndex: 22),
+
+                new IndirectObjectEndToken(30),
+            };
+
+            Assert.ThrowsAny<Exception>(() =>
+            {
+                _ = ParseTokens(tokens);
+            });
+        }
+
+        [Fact]
+        public void TestArrayInsteadOfStreamDictionary()
+        {
+            // Length key is missing from stream dictionary
+
+            List<Token> tokens = new List<Token>
+            {
+                new NumericIntegerToken(123, new byte[] { (byte)'1', (byte)'2', (byte)'3' }, 1),
+                new NumericIntegerToken(456, new byte[] { (byte)'4', (byte)'5', (byte)'6' }, 2),
+                new IndirectObjectBeginToken(3),
+
+                new ArrayBeginToken(10),
+                new NameToken(new byte[] { (byte)'D', (byte)'L' }, 11),
+                new NumericIntegerToken(17, new byte[] { (byte)'1', (byte)'7' }, 12),
+                new ArrayEndToken(13),
+
+                new StreamBeginToken(startIndex: 20, streamStartIndex: 22),
+
+                new IndirectObjectEndToken(30),
+            };
+
+            Assert.ThrowsAny<Exception>(() =>
+            {
+                _ = ParseTokens(tokens);
+            });
+        }
+
 
 
 
