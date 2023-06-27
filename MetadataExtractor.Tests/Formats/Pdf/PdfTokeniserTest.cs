@@ -195,6 +195,15 @@ namespace MetadataExtractor.Tests.Formats.Pdf
         }
 
         [Fact]
+        public void TestUnterminatedLiteralStrings()
+        {
+            Assert.ThrowsAny<Exception>(() =>
+            {
+                _ = GetTokeniserForInput(" (abcd").Tokenise().ToArray();
+            });
+        }
+
+        [Fact]
         public void TestHexadecimalStrings()
         {
             foreach (string input in _testHexadecimalStrings.Keys)
@@ -210,6 +219,15 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                     Assert.Equal(expected[i], actual[i], new TokenEqualityComparer());
                 }
             }
+        }
+
+        [Fact]
+        public void TestUnterminatedHexadecimalStrings()
+        {
+            Assert.ThrowsAny<Exception>(() =>
+            {
+                _ = GetTokeniserForInput(" <abcd").Tokenise().ToArray();
+            });
         }
 
         [Fact]
