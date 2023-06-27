@@ -4,18 +4,55 @@ using System;
 
 namespace MetadataExtractor.Formats.Pdf
 {
-    internal abstract class PdfObject
+    public abstract class PdfObject
     {
         public abstract string Type { get; }
-
-        public abstract bool HasValue { get; }
 
         public abstract object? GetValue();
 
         public abstract void Add(PdfObject pdfObject);
     }
 
-    internal class PdfScalarValue : PdfObject
+    public class PdfRoot : PdfObject
+    {
+        private PdfObject? _rootValue;
+
+        public override string Type => "root";
+
+        public PdfRoot()
+        {
+            _rootValue = null;
+        }
+
+        public override object? GetValue()
+        {
+            if (_rootValue is null)
+            {
+                throw new Exception("Value was not set");
+            }
+            return _rootValue;
+        }
+
+        public PdfObject GetRootValue()
+        {
+            if (_rootValue is null)
+            {
+                throw new Exception("Value was not set");
+            }
+            return _rootValue;
+        }
+
+        public override void Add(PdfObject pdfObject)
+        {
+            if (_rootValue is not null)
+            {
+                throw new Exception("Value already set");
+            }
+            _rootValue = pdfObject;
+        }
+    }
+
+    public class PdfScalarValue : PdfObject
     {
         private readonly string _type;
 
@@ -23,7 +60,15 @@ namespace MetadataExtractor.Formats.Pdf
 
         public override string Type => _type;
 
-        public override bool HasValue => true;
+        public static PdfScalarValue FromIndirectReference(uint objectNumber, ushort generation)
+        {
+            return new PdfScalarValue("indirect-reference", new IndirectReference(objectNumber, generation));
+        }
+
+        public static PdfScalarValue FromIndirectReference(int objectNumber, int generation)
+        {
+            return new PdfScalarValue("indirect-reference", new IndirectReference(objectNumber, generation));
+        }
 
         public static PdfScalarValue FromToken(Token token)
         {
@@ -87,102 +132,13 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
-    internal class PdfRoot : PdfObject
-    {
-        private object? _value;
-
-        private bool _valueWasSet;
-
-        public override string Type => "root";
-
-        public override bool HasValue => _valueWasSet;
-
-        public PdfRoot()
-        {
-            _valueWasSet = false;
-        }
-
-        public override object? GetValue()
-        {
-            if (!_valueWasSet)
-            {
-                throw new Exception("Value was not set");
-            }
-            return _value;
-        }
-
-        public override void Add(PdfObject pdfObject)
-        {
-            if (_valueWasSet)
-            {
-                throw new Exception("Value already set");
-            }
-            _value = pdfObject;
-            _valueWasSet = true;
-        }
-    }
-
-    internal class PdfIndirectReference : PdfObject
-    {
-        /// <summary>
-        /// Gets the sequential object number.
-        /// </summary>
-        public uint ObjectNumber { get; }
-
-        /// <summary>
-        /// The 5-digit generation number. The maximum generation number is 65,535.
-        /// </summary>
-        public ushort Generation { get; }
-
-        public override string Type => "indirect-reference";
-
-        public override bool HasValue => true;
-
-        public PdfIndirectReference(uint objectNumber, ushort generation)
-        {
-            ObjectNumber = objectNumber;
-            Generation = generation;
-        }
-
-        public PdfIndirectReference(int objectNumber, int generation)
-        {
-            if (objectNumber < 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(objectNumber));
-            }
-            if (generation < 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(generation));
-            }
-            if (generation > ushort.MaxValue)
-            {
-                throw new ArgumentOutOfRangeException(nameof(generation));
-            }
-            ObjectNumber = (uint)objectNumber;
-            Generation = (ushort)generation;
-        }
-
-        public override object? GetValue()
-        {
-            // returns the cache key of the object
-            return $"{ObjectNumber}-{Generation}";
-        }
-
-        public override void Add(PdfObject pdfObject)
-        {
-            throw new Exception("Cannot nest scalar values");
-        }
-    }
-
-    internal class PdfIndirectObject : PdfObject
+    public class PdfIndirectObject : PdfObject
     {
         private object? _value;
 
         private bool _valueWasSet;
 
         public override string Type => "indirect-object";
-
-        public override bool HasValue => _valueWasSet;
 
         public PdfIndirectObject()
         {
@@ -209,17 +165,20 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
-    internal class PdfArray : PdfObject
+    public class PdfArray : PdfObject
     {
         private readonly List<PdfObject> _array;
 
         public override string Type => "array";
 
-        public override bool HasValue => true;
-
         public PdfArray()
         {
             _array = new List<PdfObject>();
+        }
+
+        public PdfArray(IEnumerable<PdfObject> values)
+        {
+            _array = new List<PdfObject>(values);
         }
 
         public override object? GetValue()
@@ -233,7 +192,7 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
-    internal class PdfDictionary : PdfObject
+    public class PdfDictionary : PdfObject
     {
         private readonly Dictionary<string, PdfObject> _dictionary;
 
@@ -241,11 +200,14 @@ namespace MetadataExtractor.Formats.Pdf
 
         public override string Type => "dictionary";
 
-        public override bool HasValue => true;
-
         public PdfDictionary()
         {
             _dictionary = new Dictionary<string, PdfObject>();
+        }
+
+        public PdfDictionary(IDictionary<string, PdfObject> values)
+        {
+            _dictionary = new Dictionary<string, PdfObject>(values);
         }
 
         public override object? GetValue()

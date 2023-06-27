@@ -13,20 +13,57 @@ using DirectoryList = System.Collections.Generic.IReadOnlyList<MetadataExtractor
 
 namespace MetadataExtractor.Formats.Pdf
 {
-    /// <summary>
-    /// Models object references found in the Cross-Reference (Xref) Table via <see cref="PdfReader.ProcessAtoms"/>.
-    /// </summary>
-    internal sealed class XrefEntry
+    public struct IndirectReference
     {
         /// <summary>
-        /// Gets the sequential object number.
+        /// The sequential object number.
         /// </summary>
         public uint ObjectNumber { get; }
 
         /// <summary>
+        /// The 5-digit generation number. The maximum generation number is 65,535.
+        /// </summary>
+        public ushort Generation { get; }
+
+        public IndirectReference(uint objectNumber, ushort generation)
+        {
+            ObjectNumber = objectNumber;
+            Generation = generation;
+        }
+
+        public IndirectReference(int objectNumber, int generation)
+        {
+            if (objectNumber < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(objectNumber));
+            }
+            if (generation < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(generation));
+            }
+            if (generation > ushort.MaxValue)
+            {
+                throw new ArgumentOutOfRangeException(nameof(generation));
+            }
+            ObjectNumber = (uint)objectNumber;
+            Generation = (ushort)generation;
+        }
+    }
+
+    /// <summary>
+    /// Models object references found in the Cross-Reference (Xref) Table via <see cref="PdfReader.ProcessAtoms"/>.
+    /// </summary>
+    internal struct XrefEntry
+    {
+        /// <summary>
         /// Gets the 10-digit decimal number indicating the byte offset within the file.
         /// </summary>
         public long Offset { get; }
+
+        /// <summary>
+        /// The sequential object number.
+        /// </summary>
+        public uint ObjectNumber { get; }
 
         /// <summary>
         /// The 5-digit generation number. The maximum generation number is 65,535.

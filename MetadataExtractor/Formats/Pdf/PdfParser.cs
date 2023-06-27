@@ -4,15 +4,13 @@ using System;
 
 namespace MetadataExtractor.Formats.Pdf
 {
-    internal class PdfParser
+    public class PdfParser
     {
         private class ParseContext
         {
             private readonly Stack<PdfObject> _stack;
 
             public bool IsRoot => _stack.Peek().Type == "root";
-
-            public bool HasValue => _stack.Peek().HasValue;
 
             private string ContextType => _stack.Peek().Type;
 
@@ -55,17 +53,24 @@ namespace MetadataExtractor.Formats.Pdf
                 }
             }
 
-            public object? GetValue()
+            public PdfObject GetValue()
             {
                 if (_stack.Count != 1)
                 {
                     throw new Exception("Invalid context count");
                 }
-                return _stack.Peek().GetValue();
+                if (_stack.Peek() is PdfRoot pdfRoot)
+                {
+                    return pdfRoot.GetRootValue(); // a PdfObject
+                }
+                else
+                {
+                    throw new Exception("Invalid context root");
+                }
             }
         }
 
-        public static object? ParseObject(string input, int startIndex)
+        public static PdfObject ParseObject(string input, int startIndex)
         {
             StringByteProviderSource byteProviderSource = new StringByteProviderSource(input, startIndex, ExtractionDirection.Forward);
 
@@ -76,7 +81,7 @@ namespace MetadataExtractor.Formats.Pdf
             return ParseObject(tokenProvider);
         }
 
-        public static object? ParseObject(IndexedReader reader, int startIndex)
+        public static PdfObject ParseObject(IndexedReader reader, int startIndex)
         {
             IndexedReaderByteProviderSource byteProviderSource = new IndexedReaderByteProviderSource(reader, startIndex, ExtractionDirection.Forward);
 
@@ -100,39 +105,35 @@ namespace MetadataExtractor.Formats.Pdf
             return tokenProvider;
         }
 
-        public static object? ParseObject(ItemProvider<Token> tokenProvider)
+        public static PdfObject ParseObject(ItemProvider<Token> tokenProvider)
         {
             var parseContext = new ParseContext();
 
             while (tokenProvider.HasNextItem)
             {
-                // first check if we have either an indirect object (objectNumber generation "obj" ... "endobj")
-                // or an indirect reference to an object (objectNumber generation "R")
-
-                if (tokenProvider.PeekNextItem(0) is NumericIntegerToken objectNumberToken
-                    && tokenProvider.PeekNextItem(1) is NumericIntegerToken generationToken
-                    )
-                {
-                    var objectNumber = objectNumberToken.IntegerValue;
-                    var generation = generationToken.IntegerValue;
-
-                    if (tokenProvider.PeekNextItem(2) is IndirectObjectBeginToken)
-                    {
-                        parseContext.StartContext("indirect-object");
-                        tokenProvider.Consume(3);
-                        continue;
-                    }
-                    else if (tokenProvider.PeekNextItem(2) is IndirectReferenceMarkerToken)
-                    {
-                        parseContext.Add(new PdfIndirectReference(objectNumber, generation));
-                        tokenProvider.Consume(3);
-                        continue;
-                    }
-                }
-
                 var nextToken = tokenProvider.GetNextItem();
 
-                if (nextToken is ArrayBeginToken)
+                // first check if we have either an indirect object (objectNumber generation "obj" ... "endobj")
+                // or an indirect reference to an object (objectNumber generation "R")
+                // (which spans 3 tokens)
+
+                if (nextToken is NumericIntegerToken
+                    && tokenProvider.PeekNextItem(0) is NumericIntegerToken
+                    && tokenProvider.PeekNextItem(1) is IndirectObjectBeginToken
+                    )
+                {
+                    tokenProvider.Consume(2);
+                    parseContext.StartContext("indirect-object");
+                }
+                else if (nextToken is NumericIntegerToken objectNumberToken
+                    && tokenProvider.PeekNextItem(0) is NumericIntegerToken generationToken
+                    && tokenProvider.PeekNextItem(1) is IndirectReferenceMarkerToken
+                    )
+                {
+                    tokenProvider.Consume(2);
+                    parseContext.Add(PdfScalarValue.FromIndirectReference(objectNumberToken.IntegerValue, generationToken.IntegerValue));
+                }
+                else if (nextToken is ArrayBeginToken)
                 {
                     parseContext.StartContext("array");
                 }
@@ -193,7 +194,7 @@ namespace MetadataExtractor.Formats.Pdf
 
             }
 
-            return parseContext.GetValue();
+            return parseContext.GetValue(); // throws if no value has been set
         }
 
 
