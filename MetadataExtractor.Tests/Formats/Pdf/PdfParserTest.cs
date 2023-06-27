@@ -62,7 +62,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                         return ((StringValue)value1)!.Bytes.EqualTo(((StringValue)value2)!.Bytes);
                     case "indirect-reference":
                         return ((ObjectIdentifier)value1).ObjectNumber == ((ObjectIdentifier)value2).ObjectNumber
-                            && ((ObjectIdentifier)value1).Generation == ((ObjectIdentifier)value2).Generation;
+                            && ((ObjectIdentifier)value1).GenerationNumber == ((ObjectIdentifier)value2).GenerationNumber;
                     case "array":
                         return ((List<PdfObject>)value1).SequenceEqual((List<PdfObject>)value2, this);
                     case "dictionary":
@@ -74,7 +74,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                         PdfIndirectObject identifier1 = (PdfIndirectObject)object1;
                         PdfIndirectObject identifier2 = (PdfIndirectObject)object2;
                         return identifier1.ObjectNumber == identifier2.ObjectNumber
-                            && identifier1.Generation == identifier2.Generation
+                            && identifier1.GenerationNumber == identifier2.GenerationNumber
                             && Equals((PdfObject)value1, (PdfObject)value2);
                     case "stream":
                         PdfStream stream1 = (PdfStream)object1;

@@ -23,30 +23,30 @@ namespace MetadataExtractor.Formats.Pdf
         /// <summary>
         /// The 5-digit generation number. The maximum generation number is 65,535.
         /// </summary>
-        public ushort Generation { get; }
+        public ushort GenerationNumber { get; }
 
-        public ObjectIdentifier(uint objectNumber, ushort generation)
+        public ObjectIdentifier(uint objectNumber, ushort generationNumber)
         {
             ObjectNumber = objectNumber;
-            Generation = generation;
+            GenerationNumber = generationNumber;
         }
 
-        public ObjectIdentifier(int objectNumber, int generation)
+        public ObjectIdentifier(int objectNumber, int generationNumber)
         {
             if (objectNumber < 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(objectNumber));
             }
-            if (generation < 0)
+            if (generationNumber < 0)
             {
-                throw new ArgumentOutOfRangeException(nameof(generation));
+                throw new ArgumentOutOfRangeException(nameof(generationNumber));
             }
-            if (generation > ushort.MaxValue)
+            if (generationNumber > ushort.MaxValue)
             {
-                throw new ArgumentOutOfRangeException(nameof(generation));
+                throw new ArgumentOutOfRangeException(nameof(generationNumber));
             }
             ObjectNumber = (uint)objectNumber;
-            Generation = (ushort)generation;
+            GenerationNumber = (ushort)generationNumber;
         }
     }
 
