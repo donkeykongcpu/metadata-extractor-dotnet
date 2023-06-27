@@ -42,6 +42,11 @@ namespace MetadataExtractor.Formats.Pdf
             return _rootValue;
         }
 
+        public void SetRootValue(PdfObject pdfObject)
+        {
+            _rootValue = pdfObject;
+        }
+
         public override void Add(PdfObject pdfObject)
         {
             if (_rootValue is not null)
@@ -231,6 +236,52 @@ namespace MetadataExtractor.Formats.Pdf
                 }
                 _currentKey = null;
             }
+        }
+
+        public int GetNumericIntegerForKey(string key)
+        {
+            PdfObject value = _dictionary[key];
+            if (value is PdfScalarValue scalarValue && scalarValue.Type == "numeric-integer")
+            {
+                return Convert.ToInt32(value.GetValue());
+            }
+            else
+            {
+                throw new Exception($"Value for key {key} is not a numeric integer");
+            }
+        }
+    }
+
+    public class PdfStream : PdfObject
+    {
+        // from the spec:
+        // All streams shall be indirect objects and the stream dictionary shall be a direct object
+
+        public override string Type => "stream";
+
+        public PdfDictionary StreamDictionary { get; }
+
+        public int StreamStartIndex { get; }
+
+        public int StreamLength { get; }
+
+        public PdfStream(PdfDictionary streamDictionary, int streamStartIndex)
+        {
+            StreamDictionary = streamDictionary;
+
+            StreamStartIndex = streamStartIndex;
+
+            StreamLength = streamDictionary.GetNumericIntegerForKey("Length");
+        }
+
+        public override object? GetValue()
+        {
+            return StreamDictionary;
+        }
+
+        public override void Add(PdfObject pdfObject)
+        {
+            throw new Exception("Cannot nest within stream");
         }
     }
 }

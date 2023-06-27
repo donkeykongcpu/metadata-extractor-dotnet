@@ -12,6 +12,8 @@ namespace MetadataExtractor.Formats.Pdf
 
             public bool IsRoot => _stack.Peek().Type == "root";
 
+            public bool IsIndirectObject => _stack.Peek().Type == "indirect-object";
+
             private string ContextType => _stack.Peek().Type;
 
             public ParseContext()
@@ -41,7 +43,31 @@ namespace MetadataExtractor.Formats.Pdf
                 Debug.Assert(_stack.Count > 0);
             }
 
-            public PdfObject GetValue()
+            public PdfObject GetIndirectObjectValue()
+            {
+                if (_stack.Peek() is PdfIndirectObject pdfIndirectObject)
+                {
+                    return pdfIndirectObject.GetRootValue(); // a PdfObject
+                }
+                else
+                {
+                    throw new Exception("Invalid context type");
+                }
+            }
+
+            public void ReplaceIndirectObjectValue(PdfStream pdfStream)
+            {
+                if (_stack.Peek() is PdfIndirectObject pdfIndirectObject)
+                {
+                    pdfIndirectObject.SetRootValue(pdfStream);
+                }
+                else
+                {
+                    throw new Exception("Invalid context type");
+                }
+            }
+
+            public PdfObject GetRootValue()
             {
                 if (_stack.Count != 1)
                 {
@@ -120,6 +146,26 @@ namespace MetadataExtractor.Formats.Pdf
                     }
                     tokenProvider.Consume(2);
                 }
+                else if (nextToken is StreamBeginToken streamBeginToken)
+                {
+                    // all stream objects are indirect objects, so we must be within an "indirect-object" context
+                    if (!parseContext.IsIndirectObject)
+                    {
+                        throw new Exception("Invalid context type for stream");
+                    }
+                    // the current value of the indirect object context must be a dictionary, which represents the stream dictionary
+                    object? indirectObjectValue = parseContext.GetIndirectObjectValue();
+                    // create a PDF stream with this dictionary as stream dictionary, then replace the value of the indirect object context with it
+                    if (indirectObjectValue is PdfDictionary streamDictionary)
+                    {
+                        PdfStream pdfStream = new PdfStream(streamDictionary, streamBeginToken.StreamStartIndex);
+                        parseContext.ReplaceIndirectObjectValue(pdfStream);
+                    }
+                    else
+                    {
+                        throw new Exception("Invalid stream dictionary");
+                    }
+                }
                 else if (nextToken is ArrayBeginToken)
                 {
                     parseContext.StartContext(new PdfArray());
@@ -157,12 +203,7 @@ namespace MetadataExtractor.Formats.Pdf
               
 
 
-                //if (nextToken == "stream")
-                //{
-                //    // TODO implement stream objects
 
-                //    break;
-                //}
 
                 //if (nextToken == "xref")
                 //{
@@ -181,7 +222,7 @@ namespace MetadataExtractor.Formats.Pdf
 
             }
 
-            return parseContext.GetValue(); // throws if no value has been set
+            return parseContext.GetRootValue(); // throws if no value has been set
         }
 
 

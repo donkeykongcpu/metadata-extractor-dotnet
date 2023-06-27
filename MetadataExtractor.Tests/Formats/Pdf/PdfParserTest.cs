@@ -71,9 +71,17 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                         return dictionary1.Keys.Count == dictionary2.Keys.Count
                             && dictionary1.All(item => dictionary2.ContainsKey(item.Key) && Equals(item.Value, dictionary2[item.Key]));
                     case "indirect-object":
-                        return ((PdfIndirectObject)object1).ObjectNumber == ((PdfIndirectObject)object2).ObjectNumber
-                            && ((PdfIndirectObject)object1).Generation == ((PdfIndirectObject)object2).Generation
+                        PdfIndirectObject identifier1 = (PdfIndirectObject)object1;
+                        PdfIndirectObject identifier2 = (PdfIndirectObject)object2;
+                        return identifier1.ObjectNumber == identifier2.ObjectNumber
+                            && identifier1.Generation == identifier2.Generation
                             && Equals((PdfObject)value1, (PdfObject)value2);
+                    case "stream":
+                        PdfStream stream1 = (PdfStream)object1;
+                        PdfStream stream2 = (PdfStream)object2;
+                        return stream1.StreamStartIndex == stream2.StreamStartIndex
+                            && stream1.StreamLength == stream2.StreamLength
+                            && Equals(stream1.StreamDictionary, stream2.StreamDictionary);
                     //case "XXX": return XXX;
                     default: throw new Exception($"Unknown object type: {object1.Type}");
                 }
@@ -359,6 +367,43 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
         }
 
+        [Fact]
+        public void TestStreams()
+        {
+            List<Token> tokens = new List<Token>
+            {
+                new NumericIntegerToken(123, new byte[] { (byte)'1', (byte)'2', (byte)'3' }, 1),
+                new NumericIntegerToken(456, new byte[] { (byte)'4', (byte)'5', (byte)'6' }, 2),
+                new IndirectObjectBeginToken(3),
+
+                new DictionaryBeginToken(10),
+                new NameToken(new byte[] { (byte)'L', (byte)'e', (byte)'n', (byte)'g', (byte)'t', (byte)'h' }, 11),
+                new NumericIntegerToken(7, new byte[] { (byte)'7' }, 12),
+                new NameToken(new byte[] { (byte)'D', (byte)'L' }, 13),
+                new NumericIntegerToken(17, new byte[] { (byte)'1', (byte)'7' }, 14),
+                new DictionaryEndToken(15),
+
+                new StreamBeginToken(startIndex: 20, streamStartIndex: 22),
+
+                new IndirectObjectEndToken(30),
+            };
+
+            PdfObject actual = ParseTokens(tokens);
+
+            PdfObject expected = new PdfIndirectObject(123, 456);
+
+            PdfDictionary streamDictionary = new PdfDictionary(new Dictionary<string, PdfObject>
+            {
+                { "Length", PdfScalarValue.FromToken(new NumericIntegerToken(7, new byte[] { (byte)'7' }, 12)) },
+                { "DL", PdfScalarValue.FromToken(new NumericIntegerToken(17, new byte[] { (byte)'1', (byte)'7' }, 14)) },
+            });
+
+            PdfStream pdfStream = new PdfStream(streamDictionary, streamStartIndex: 22);
+
+            expected.Add(pdfStream);
+
+            Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
+        }
 
 
 
