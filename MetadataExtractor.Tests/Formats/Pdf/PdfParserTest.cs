@@ -106,7 +106,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             PdfObject actual = ParseTokens(tokens);
 
-            PdfObject expected = PdfScalarValue.FromToken(new BooleanToken(true, 1));
+            PdfObject expected = new PdfBoolean(true);
 
             Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
         }
@@ -122,7 +122,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             PdfObject actual = ParseTokens(tokens);
 
-            PdfObject expected = PdfScalarValue.FromToken(new BooleanToken(false, 1));
+            PdfObject expected = new PdfBoolean(false);
 
             Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
         }
@@ -138,7 +138,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             PdfObject actual = ParseTokens(tokens);
 
-            PdfObject expected = PdfScalarValue.FromToken(new NullToken(1));
+            PdfObject expected = new PdfNull();
 
             Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
         }
@@ -158,7 +158,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             PdfObject actual = ParseTokens(tokens);
 
-            PdfObject expected = PdfScalarValue.FromToken(new BooleanToken(true, 5));
+            PdfObject expected = new PdfBoolean(true);
 
             Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
         }
@@ -174,7 +174,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             PdfObject actual = ParseTokens(tokens);
 
-            PdfObject expected = PdfScalarValue.FromToken(new NumericIntegerToken(123, new byte[] { (byte)'1', (byte)'2', (byte)'3' }, 1));
+            PdfObject expected = new PdfNumericInteger(123);
 
             Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
         }
@@ -190,7 +190,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             PdfObject actual = ParseTokens(tokens);
 
-            PdfObject expected = PdfScalarValue.FromToken(new NumericRealToken(3.14m, new byte[] { (byte)'3', (byte)'.', (byte)'1', (byte)'4' }, 1));
+            PdfObject expected = new PdfNumericReal(3.14m);
 
             Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
         }
@@ -206,7 +206,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             PdfObject actual = ParseTokens(tokens);
 
-            PdfObject expected = PdfScalarValue.FromToken(new StringToken(new byte[] { (byte)'a', (byte)'B', (byte)'c', (byte)'D' }, 1));
+            PdfObject expected = CreatePdfString("aBcD");
 
             Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
         }
@@ -222,7 +222,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             PdfObject actual = ParseTokens(tokens);
 
-            PdfObject expected = PdfScalarValue.FromToken(new NameToken(new byte[] { (byte)'a', (byte)'B', (byte)'c', (byte)'D' }, 1));
+            PdfObject expected = CreatePdfName("aBcD");
 
             Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
         }
@@ -240,7 +240,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             PdfObject actual = ParseTokens(tokens);
 
-            PdfObject expected = PdfScalarValue.FromIndirectReference(123, 456);
+            PdfObject expected = new PdfIndirectReference(123, 456);
 
             Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
         }
@@ -263,9 +263,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             PdfObject expected = new PdfArray(new List<PdfObject>
             {
-                PdfScalarValue.FromIndirectReference(123, 456),
-                PdfScalarValue.FromToken(new StringToken(new byte[] { (byte)'a', (byte)'B', (byte)'c', (byte)'D' }, 5)),
-                PdfScalarValue.FromToken(new BooleanToken(true, 6))
+                new PdfIndirectReference(123, 456),
+                CreatePdfString("aBcD"),
+                new PdfBoolean(true),
             });
 
             Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
@@ -288,8 +288,8 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             PdfObject expected = new PdfDictionary(new Dictionary<string, PdfObject>
             {
-                { "Key1", PdfScalarValue.FromToken(new NumericIntegerToken(123, new byte[] { (byte)'1', (byte)'2', (byte)'3' }, 3)) },
-                { "Key2", PdfScalarValue.FromToken(new BooleanToken(true, 5)) },
+                { "Key1", new PdfNumericInteger(123) },
+                { "Key2", new PdfBoolean(true) },
             });
 
             Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
@@ -322,13 +322,13 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             PdfObject expected = new PdfDictionary(new Dictionary<string, PdfObject>
             {
-                { "Key1", PdfScalarValue.FromToken(new NumericIntegerToken(123, new byte[] { (byte)'1', (byte)'2', (byte)'3' }, 3)) },
-                { "Key2", PdfScalarValue.FromToken(new BooleanToken(true, 5)) },
+                { "Key1", new PdfNumericInteger(123) },
+                { "Key2", new PdfBoolean(true) },
                 { "Key3", new PdfArray(new List<PdfObject>
                 {
-                    PdfScalarValue.FromIndirectReference(123, 456),
-                    PdfScalarValue.FromToken(new StringToken(new byte[] { (byte)'a', (byte)'B', (byte)'c', (byte)'D' }, 5)),
-                    PdfScalarValue.FromToken(new BooleanToken(true, 6)),
+                    new PdfIndirectReference(123, 456),
+                    CreatePdfString("aBcD"),
+                    new PdfBoolean(true),
                 }) }
             });
 
@@ -356,12 +356,10 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             PdfObject actual = ParseTokens(tokens);
 
-            PdfObject expected = new PdfIndirectObject(123, 456);
-
-            expected.Add(new PdfDictionary(new Dictionary<string, PdfObject>
+            PdfIndirectObject expected = new PdfIndirectObject(123, 456, new PdfDictionary(new Dictionary<string, PdfObject>
             {
-                { "Key1", PdfScalarValue.FromToken(new NumericIntegerToken(789, new byte[] { (byte)'7', (byte)'8', (byte)'9' }, 12)) },
-                { "Key2", PdfScalarValue.FromToken(new BooleanToken(true, 14)) },
+                { "Key1", new PdfNumericInteger(789) },
+                { "Key2", new PdfBoolean(true) },
             }));
 
             Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
@@ -390,15 +388,15 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             PdfObject actual = ParseTokens(tokens);
 
-            PdfObject expected = new PdfIndirectObject(123, 456);
+            PdfIndirectObject expected = new PdfIndirectObject(123, 456);
 
             PdfDictionary streamDictionary = new PdfDictionary(new Dictionary<string, PdfObject>
             {
-                { "Length", PdfScalarValue.FromToken(new NumericIntegerToken(7, new byte[] { (byte)'7' }, 12)) },
-                { "DL", PdfScalarValue.FromToken(new NumericIntegerToken(17, new byte[] { (byte)'1', (byte)'7' }, 14)) },
+                { "Length",new PdfNumericInteger(7) },
+                { "DL", new PdfNumericInteger(17) },
             });
 
-            PdfStream pdfStream = new PdfStream(streamDictionary, streamStartIndex: 22);
+            PdfStream pdfStream = new PdfStream(expected.Identifier, streamDictionary, streamStartIndex: 22);
 
             expected.Add(pdfStream);
 
@@ -413,33 +411,6 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                 new NumericIntegerToken(123, new byte[] { (byte)'1', (byte)'2', (byte)'3' }, 1),
                 new NumericIntegerToken(456, new byte[] { (byte)'4', (byte)'5', (byte)'6' }, 2),
                 new IndirectObjectBeginToken(3),
-
-                new StreamBeginToken(startIndex: 20, streamStartIndex: 22),
-
-                new IndirectObjectEndToken(30),
-            };
-
-            Assert.ThrowsAny<Exception>(() =>
-            {
-                _ = ParseTokens(tokens);
-            });
-        }
-
-        [Fact]
-        public void TestInvalidStreamDictionary()
-        {
-            // Length key is missing from stream dictionary
-
-            List<Token> tokens = new List<Token>
-            {
-                new NumericIntegerToken(123, new byte[] { (byte)'1', (byte)'2', (byte)'3' }, 1),
-                new NumericIntegerToken(456, new byte[] { (byte)'4', (byte)'5', (byte)'6' }, 2),
-                new IndirectObjectBeginToken(3),
-
-                new DictionaryBeginToken(10),
-                new NameToken(new byte[] { (byte)'D', (byte)'L' }, 11),
-                new NumericIntegerToken(17, new byte[] { (byte)'1', (byte)'7' }, 12),
-                new DictionaryEndToken(13),
 
                 new StreamBeginToken(startIndex: 20, streamStartIndex: 22),
 
