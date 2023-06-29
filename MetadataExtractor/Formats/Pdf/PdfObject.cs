@@ -133,8 +133,6 @@ namespace MetadataExtractor.Formats.Pdf
 
         public int StreamStartIndex { get; }
 
-        public int StreamLength { get; }
-
         public PdfStream(ObjectIdentifier identifier, PdfDictionary streamDictionary, int streamStartIndex)
         {
             Identifier = identifier;
@@ -142,8 +140,6 @@ namespace MetadataExtractor.Formats.Pdf
             StreamDictionary = streamDictionary;
 
             StreamStartIndex = streamStartIndex;
-
-            StreamLength = streamDictionary.GetNumericIntegerForKey("Length");
         }
     }
 
