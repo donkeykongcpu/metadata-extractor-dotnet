@@ -118,26 +118,22 @@ namespace MetadataExtractor.Formats.Pdf
             }
         }
 
-        public static PdfObject ParseObject(string input, int startIndex)
+        private static ItemProvider<Token> GetTokenProvider(string input, int startIndex)
         {
             StringByteProviderSource byteProviderSource = new StringByteProviderSource(input, startIndex, ExtractionDirection.Forward);
 
             BufferedItemProvider<byte> byteProvider = new BufferedItemProvider<byte>(byteProviderSource, 1024);
 
-            ItemProvider<Token> tokenProvider = GetTokenProvider(byteProvider);
-
-            return ParseObject(tokenProvider);
+            return GetTokenProvider(byteProvider);
         }
 
-        public static PdfObject ParseObject(IndexedReader reader, int startIndex)
+        private static ItemProvider<Token> GetTokenProvider(IndexedReader reader, int startIndex)
         {
             IndexedReaderByteProviderSource byteProviderSource = new IndexedReaderByteProviderSource(reader, startIndex, ExtractionDirection.Forward);
 
             BufferedItemProvider<byte> byteProvider = new BufferedItemProvider<byte>(byteProviderSource, 1024);
 
-            ItemProvider<Token> tokenProvider = GetTokenProvider(byteProvider);
-
-            return ParseObject(tokenProvider);
+            return GetTokenProvider(byteProvider);
         }
 
         private static ItemProvider<Token> GetTokenProvider(ItemProvider<byte> byteProvider)
@@ -153,7 +149,48 @@ namespace MetadataExtractor.Formats.Pdf
             return tokenProvider;
         }
 
-        public static PdfObject ParseObject(ItemProvider<Token> tokenProvider)
+        public static T ParseIndirectObject<T>(string input, int startIndex, int objectNumber, int generationNumber) where T : PdfObject
+        {
+            return ParseIndirectObject<T>(GetTokenProvider(input, startIndex), objectNumber, generationNumber);
+        }
+
+        public static T ParseIndirectObject<T>(IndexedReader reader, int startIndex, int objectNumber, int generationNumber) where T : PdfObject
+        {
+            return ParseIndirectObject<T>(GetTokenProvider(reader, startIndex), objectNumber, generationNumber);
+        }
+
+        public static T ParseIndirectObject<T>(ItemProvider<Token> tokenProvider, int objectNumber, int generationNumber) where T : PdfObject
+        {
+            // unwraps the indirect object
+            // (after checking, in Debug mode, that the requested object number and generation number match)
+
+            PdfIndirectObject indirectObject = ParseObject<PdfIndirectObject>(tokenProvider);
+
+            Debug.Assert(indirectObject.Identifier.ObjectNumber == objectNumber);
+
+            Debug.Assert(indirectObject.Identifier.GenerationNumber == generationNumber);
+
+            if (indirectObject.Value is T obj)
+            {
+                return obj;
+            }
+            else
+            {
+                throw new Exception($"Unexpected object type {indirectObject.Value.GetType()}");
+            }
+        }
+
+        public static T ParseObject<T>(string input, int startIndex) where T : PdfObject
+        {
+            return ParseObject<T>(GetTokenProvider(input, startIndex));
+        }
+
+        public static T ParseObject<T>(IndexedReader reader, int startIndex) where T : PdfObject
+        {
+            return ParseObject<T>(GetTokenProvider(reader, startIndex));
+        }
+
+        public static T ParseObject<T>(ItemProvider<Token> tokenProvider) where T : PdfObject
         {
             var parseContext = new ParseContext();
 
@@ -281,7 +318,16 @@ namespace MetadataExtractor.Formats.Pdf
 
             }
 
-            return parseContext.GetRootValue(); // throws if no value has been set
+            PdfObject result = parseContext.GetRootValue(); // throws if no value has been set
+
+            if (result is T obj)
+            {
+                return obj;
+            }
+            else
+            {
+                throw new Exception($"Unexpected object type {result.GetType()}");
+            }
         }
 
 
