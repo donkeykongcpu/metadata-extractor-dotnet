@@ -8,35 +8,6 @@ namespace MetadataExtractor.Tests.Formats.Pdf
     /// <author>Drew Noakes https://drewnoakes.com</author>
     public sealed class PdfTokeniserTest
     {
-        private static StringToken CreateStringToken(string value, int startIndex)
-        {
-            // NOTE: value should only contain 1-byte characters
-            return new StringToken(value.ToCharArray().Select(c => (byte)c).ToArray(), startIndex);
-        }
-
-        private static NameToken CreateNameToken(string value, int startIndex)
-        {
-            // NOTE: value should only contain 1-byte characters
-            return new NameToken(value.ToCharArray().Select(c => (byte)c).ToArray(), startIndex);
-        }
-
-        private static CommentToken CreateCommentToken(string value, int startIndex)
-        {
-            // NOTE: value should only contain 1-byte characters
-            return new CommentToken(value.ToCharArray().Select(c => (byte)c).ToArray(), startIndex);
-        }
-
-        private static HeaderCommentToken CreateHeaderCommentToken(string value, string version, int startIndex)
-        {
-            // NOTE: value should only contain 1-byte characters
-            return new HeaderCommentToken(value.ToCharArray().Select(c => (byte)c).ToArray(), version, startIndex);
-        }
-
-        private static NumericIntegerToken CreateNumericIntegerToken(int value, int startIndex)
-        {
-            return new NumericIntegerToken(value, value.ToString().ToCharArray().Select(c => (byte)c).ToArray(), startIndex);
-        }
-
         private static Dictionary<string, StringToken[]> _testLiteralStrings = new Dictionary<string, StringToken[]>
         {
             { "(This is a string)", new StringToken[] { CreateStringToken("This is a string", 0) } },
@@ -714,5 +685,33 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             }
         }
 
+        private static StringToken CreateStringToken(string value, int startIndex)
+        {
+            // NOTE: value should only contain 1-byte characters
+            return new StringToken(value.ToCharArray().Select(c => (byte)c).ToArray(), startIndex);
+        }
+
+        private static NameToken CreateNameToken(string value, int startIndex)
+        {
+            // NOTE: value should only contain 1-byte characters
+            return new NameToken(value.ToCharArray().Select(c => (byte)c).ToArray(), startIndex);
+        }
+
+        private static CommentToken CreateCommentToken(string value, int startIndex)
+        {
+            // NOTE: value should only contain 1-byte characters
+            return new CommentToken(value.ToCharArray().Select(c => (byte)c).ToArray(), startIndex);
+        }
+
+        private static HeaderCommentToken CreateHeaderCommentToken(string value, string version, int startIndex)
+        {
+            // NOTE: value should only contain 1-byte characters
+            return new HeaderCommentToken(value.ToCharArray().Select(c => (byte)c).ToArray(), version, startIndex);
+        }
+
+        private static NumericIntegerToken CreateNumericIntegerToken(int value, int startIndex)
+        {
+            return new NumericIntegerToken(value, value.ToString().ToCharArray().Select(c => (byte)c).ToArray(), startIndex);
+        }
     }
 }
