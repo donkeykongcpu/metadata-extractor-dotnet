@@ -33,7 +33,12 @@ namespace MetadataExtractor.Formats.Pdf
 
     public abstract class PdfScalarObject<T> : PdfObject
     {
-        public abstract T Value { get; }
+        public T Value { get; private set; }
+
+        protected PdfScalarObject(T value)
+        {
+            Value = value;
+        }
     }
 
     #region Scalar objects
@@ -44,41 +49,29 @@ namespace MetadataExtractor.Formats.Pdf
 
     public class PdfBoolean : PdfScalarObject<bool>
     {
-        public override bool Value { get; }
-
-        public PdfBoolean(bool value)
+        public PdfBoolean(bool value) : base(value)
         {
-            Value = value;
         }
     }
 
     public class PdfNumericInteger : PdfScalarObject<int>
     {
-        public override int Value { get; }
-
-        public PdfNumericInteger(int value)
+        public PdfNumericInteger(int value) : base(value)
         {
-            Value = value;
         }
     }
 
     public class PdfNumericReal : PdfScalarObject<decimal>
     {
-        public override decimal Value { get; }
-
-        public PdfNumericReal(decimal value)
+        public PdfNumericReal(decimal value) : base(value)
         {
-            Value = value;
         }
     }
 
     public class PdfString : PdfScalarObject<StringValue>
     {
-        public override StringValue Value { get; }
-
-        public PdfString(StringValue value)
+        public PdfString(StringValue value) : base(value)
         {
-            Value = value;
         }
 
         public string ToASCIIString()
@@ -94,31 +87,25 @@ namespace MetadataExtractor.Formats.Pdf
 
     public class PdfName : PdfString
     {
-        public PdfName(StringValue value)
-            : base(value)
+        public PdfName(StringValue value) : base(value)
         {
         }
     }
 
     public class PdfIndirectReference : PdfScalarObject<ObjectIdentifier>
     {
-        public override ObjectIdentifier Value { get; }
-
-        public PdfIndirectReference(ObjectIdentifier value)
+        public PdfIndirectReference(ObjectIdentifier value) : base(value)
         {
-            Value = value;
         }
 
         public PdfIndirectReference(uint objectNumber, ushort generationNumber)
-           : base()
+           : base(new ObjectIdentifier(objectNumber, generationNumber))
         {
-            Value = new ObjectIdentifier(objectNumber, generationNumber);
         }
 
         public PdfIndirectReference(int objectNumber, int generationNumber)
-            : base()
+            : base(new ObjectIdentifier(objectNumber, generationNumber))
         {
-            Value = new ObjectIdentifier(objectNumber, generationNumber);
         }
     }
 
