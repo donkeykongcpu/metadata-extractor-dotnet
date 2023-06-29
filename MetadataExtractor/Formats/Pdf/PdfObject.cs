@@ -21,7 +21,7 @@ namespace MetadataExtractor.Formats.Pdf
     {
         public abstract string Type { get; }
 
-        public abstract T Value { get; }
+        public abstract T GetValue();
 
         public void Nest<U>(PdfContainer<U> pdfContainer)
         {
@@ -148,16 +148,13 @@ namespace MetadataExtractor.Formats.Pdf
     {
         private PdfObject? _value;
 
-        public override PdfObject Value
+        public override PdfObject GetValue()
         {
-            get
+            if (_value is null)
             {
-                if (_value is null)
-                {
-                    throw new Exception("Value was not set"); // TODO: getters are not supposed to throw
-                }
-                return _value;
+                throw new Exception("Value was not set");
             }
+            return _value;
         }
 
         public override string Type => "root";
@@ -216,29 +213,39 @@ namespace MetadataExtractor.Formats.Pdf
 
     public class PdfArray : PdfContainer<List<PdfObject>>
     {
-        public override List<PdfObject> Value { get; }
+        private readonly List<PdfObject> _value;
+
+        public override List<PdfObject> GetValue()
+        {
+            return _value;
+        }
 
         public override string Type => "array";
 
         public PdfArray()
         {
-            Value = new List<PdfObject>();
+            _value = new List<PdfObject>();
         }
 
         public PdfArray(IEnumerable<PdfObject> values)
         {
-            Value = new List<PdfObject>(values);
+            _value = new List<PdfObject>(values);
         }
 
         public override void Add(PdfObject pdfObject)
         {
-            Value.Add(pdfObject);
+            _value.Add(pdfObject);
         }
     }
 
     public class PdfDictionary : PdfContainer<Dictionary<string, PdfObject>>
     {
-        public override Dictionary<string, PdfObject> Value { get; }
+        private readonly Dictionary<string, PdfObject> _value;
+
+        public override Dictionary<string, PdfObject> GetValue()
+        {
+            return _value;
+        }
 
         private string? _currentKey = null;
 
@@ -246,12 +253,12 @@ namespace MetadataExtractor.Formats.Pdf
 
         public PdfDictionary()
         {
-            Value = new Dictionary<string, PdfObject>();
+            _value = new Dictionary<string, PdfObject>();
         }
 
         public PdfDictionary(IDictionary<string, PdfObject> values)
         {
-            Value = new Dictionary<string, PdfObject>(values);
+            _value = new Dictionary<string, PdfObject>(values);
         }
 
         public override void Add(PdfObject pdfObject)
@@ -260,7 +267,7 @@ namespace MetadataExtractor.Formats.Pdf
             {
                 if (_currentKey is not null)
                 {
-                    Value.Add(_currentKey, pdfObject); // names can be values, too, in which case their encoding is probably UTF8
+                    _value.Add(_currentKey, pdfObject); // names can be values, too, in which case their encoding is probably UTF8
                     _currentKey = null;
                 }
                 else
@@ -276,7 +283,7 @@ namespace MetadataExtractor.Formats.Pdf
                 }
                 if (pdfObject is not PdfNull)
                 {
-                    Value.Add(_currentKey, pdfObject);
+                    _value.Add(_currentKey, pdfObject);
                 }
                 _currentKey = null;
             }
@@ -284,7 +291,7 @@ namespace MetadataExtractor.Formats.Pdf
 
         public int GetNumericIntegerForKey(string key)
         {
-            if (Value[key] is PdfNumericInteger numericInteger) return numericInteger.Value;
+            if (_value[key] is PdfNumericInteger numericInteger) return numericInteger.Value;
             else throw new Exception($"Value for key {key} is not a numeric integer");
         }
     }

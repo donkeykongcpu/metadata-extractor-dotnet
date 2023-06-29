@@ -109,7 +109,7 @@ namespace MetadataExtractor.Formats.Pdf
                 }
                 if (_stack.Peek() is PdfRoot pdfRoot)
                 {
-                    return pdfRoot.Value;
+                    return pdfRoot.GetValue();
                 }
                 else
                 {
@@ -170,13 +170,13 @@ namespace MetadataExtractor.Formats.Pdf
 
             Debug.Assert(indirectObject.Identifier.GenerationNumber == generationNumber);
 
-            if (indirectObject.Value is T obj)
+            if (indirectObject.GetValue() is T obj)
             {
                 return obj;
             }
             else
             {
-                throw new Exception($"Unexpected object type {indirectObject.Value.GetType()}");
+                throw new Exception($"Unexpected object type {indirectObject.GetValue().GetType()}");
             }
         }
 
@@ -223,7 +223,7 @@ namespace MetadataExtractor.Formats.Pdf
                     PdfIndirectObject indirectObject = parseContext.GetIndirectObject();
                     // the current value of the indirect object context must be a dictionary, which represents the stream dictionary
                     // create a PDF stream with this dictionary as stream dictionary, then replace the value of the indirect object context with it
-                    if (indirectObject.Value is PdfDictionary streamDictionary)
+                    if (indirectObject.GetValue() is PdfDictionary streamDictionary)
                     {
                         PdfStream pdfStream = new PdfStream(indirectObject.Identifier, streamDictionary, streamBeginToken.StreamStartIndex);
                         parseContext.ReplaceIndirectObjectValue(pdfStream);
