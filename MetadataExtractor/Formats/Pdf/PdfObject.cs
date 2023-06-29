@@ -176,6 +176,11 @@ namespace MetadataExtractor.Formats.Pdf
             _value = null;
         }
 
+        public PdfRoot(PdfObject? value)
+        {
+            _value = value;
+        }
+
         public override void Add(PdfObject pdfObject)
         {
             if (_value is not null)
@@ -205,6 +210,12 @@ namespace MetadataExtractor.Formats.Pdf
 
         public PdfIndirectObject(int objectNumber, int generationNumber)
             : base()
+        {
+            Identifier = new ObjectIdentifier(objectNumber, generationNumber);
+        }
+
+        public PdfIndirectObject(int objectNumber, int generationNumber, PdfObject? value)
+            : base(value)
         {
             Identifier = new ObjectIdentifier(objectNumber, generationNumber);
         }
