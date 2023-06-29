@@ -90,13 +90,8 @@ namespace MetadataExtractor.Formats.Pdf
         {
             byte[] tokenBytes = Encoding.ASCII.GetBytes(asciiToken);
             byte byteAfterLast = _byteProvider.PeekNextItem(tokenBytes.Length);
-            // must be followed by whitespace (or EOF), array marker, dictionary end marker or name marker
-            if (!_whitespaceChars.Contains(byteAfterLast)
-                && byteAfterLast != (byte)'[' && byteAfterLast != (byte)']'
-                && byteAfterLast != (byte)'<' && byteAfterLast != (byte)'>'
-                && byteAfterLast != (byte)'/'
-                && byteAfterLast != (byte)'('
-                )
+            // must be followed by whitespace (or EOF), or a delimiter
+            if (!_whitespaceChars.Contains(byteAfterLast) && !_delimiterChars.Contains(byteAfterLast))
             {
                 return false;
             }
@@ -417,12 +412,7 @@ namespace MetadataExtractor.Formats.Pdf
             _byteProvider.Consume(1);
             while (true)
             {
-                if (!_byteProvider.HasNextItem || MatchWhitespace()
-                    || _byteProvider.PeekNextItem(0) == (byte)'/'
-                    || _byteProvider.PeekNextItem(0) == (byte)'('
-                    || _byteProvider.PeekNextItem(0) == (byte)'<' || _byteProvider.PeekNextItem(0) == (byte)'>'
-                    || _byteProvider.PeekNextItem(0) == (byte)'[' || _byteProvider.PeekNextItem(0) == (byte)']'
-                    )
+                if (!_byteProvider.HasNextItem || MatchWhitespace() || _delimiterChars.Contains(_byteProvider.PeekNextItem(0))) // delimiters within name must be escaped with #
                 {
                     token = new NameToken(bytes.ToArray(), currentIndex); // does not include the leading slash (/)
                     return true; // success!

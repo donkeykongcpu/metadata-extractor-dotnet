@@ -677,6 +677,92 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             new object[] { " %PDF-2.0\n", CreateHeaderCommentToken("PDF-2.0", "2.0", 1) },
             new object[] { " %\u00C3\u00C4\u00C5\u00C6\n", new BinaryIndicatorCommentToken(new byte[] { 0xC3, 0xC4, 0xC5, 0xC6 }, 1) },
         };
+
+        [Theory]
+        [MemberData(nameof(TokensFollowedByDelimiter))]
+        public void TestTokensFollowedByDelimiter(string input, Token expectedToken)
+        {
+            Token[] tokens = GetTokeniserForInput(input).Tokenise().ToArray();
+
+            Token actualToken = tokens.First();
+
+            Assert.Equal(expectedToken, actualToken, new TokenEqualityComparer());
+        }
+
+        public static IEnumerable<object[]> TokensFollowedByDelimiter = new List<object[]>
+        {
+            new object[] { " R]", new IndirectReferenceMarkerToken(1) },
+            new object[] { " R>>", new IndirectReferenceMarkerToken(1) },
+            new object[] { " R/a", new IndirectReferenceMarkerToken(1) },
+            new object[] { " R%a", new IndirectReferenceMarkerToken(1) },
+
+            new object[] { " obj<<", new IndirectObjectBeginToken(1) },
+            new object[] { " obj[", new IndirectObjectBeginToken(1) },
+            new object[] { " obj/a", new IndirectObjectBeginToken(1) },
+            new object[] { " obj%a", new IndirectObjectBeginToken(1) },
+
+            new object[] { " endobj]", new IndirectObjectEndToken(1) },
+            new object[] { " endobj>>", new IndirectObjectEndToken(1) },
+            new object[] { " endobj/a", new IndirectObjectEndToken(1) },
+            new object[] { " endobj%a", new IndirectObjectEndToken(1) },
+
+            new object[] { " null]", new NullToken(1) },
+            new object[] { " null>>", new NullToken(1) },
+            new object[] { " null/a", new NullToken(1) },
+            new object[] { " null%a", new NullToken(1) },
+
+            new object[] { " true]", new BooleanToken(true, 1) },
+            new object[] { " true>>", new BooleanToken(true, 1) },
+            new object[] { " true/a", new BooleanToken(true, 1) },
+            new object[] { " true%a", new BooleanToken(true, 1) },
+
+            new object[] { " 123]", CreateNumericIntegerToken(123, 1) },
+            new object[] { " 123>>", CreateNumericIntegerToken(123, 1) },
+            new object[] { " 123/a", CreateNumericIntegerToken(123, 1) },
+            new object[] { " 123%a", CreateNumericIntegerToken(123, 1) },
+
+            new object[] { " 3.14]", CreateNumericRealToken(3.14m, 1) },
+            new object[] { " 3.14>>", CreateNumericRealToken(3.14m, 1) },
+            new object[] { " 3.14/a", CreateNumericRealToken(3.14m, 1) },
+            new object[] { " 3.14%a", CreateNumericRealToken(3.14m, 1) },
+
+            new object[] { " [[", new ArrayBeginToken(1) },
+            new object[] { " [<<", new ArrayBeginToken(1) },
+            new object[] { " [/a", new ArrayBeginToken(1) },
+            new object[] { " [%a", new ArrayBeginToken(1) },
+
+            new object[] { " ]]", new ArrayEndToken(1) },
+            new object[] { " ]>>", new ArrayEndToken(1) },
+            new object[] { " ]/a", new ArrayEndToken(1) },
+            new object[] { " ]%a", new ArrayEndToken(1) },
+
+            new object[] { " <<<ab>", new DictionaryBeginToken(1) },
+            new object[] { " <<<<", new DictionaryBeginToken(1) },
+            new object[] { " <<[", new DictionaryBeginToken(1) },
+            new object[] { " <</a", new DictionaryBeginToken(1) },
+            new object[] { " <<%a", new DictionaryBeginToken(1) },
+
+            new object[] { " >>>>", new DictionaryEndToken(1) },
+            new object[] { " >>]", new DictionaryEndToken(1) },
+            new object[] { " >>/a", new DictionaryEndToken(1) },
+            new object[] { " >>%a", new DictionaryEndToken(1) },
+
+            new object[] { " (abc])]", CreateStringToken("abc]", 1) },
+            new object[] { " (abc>>)>>", CreateStringToken("abc>>", 1) },
+            new object[] { " (abc/b)/a", CreateStringToken("abc/b", 1) },
+            new object[] { " (abc%b)%a", CreateStringToken("abc%b", 1) },
+
+            new object[] { " <abc>]", CreateStringToken("\u00AB\u00C0", 1) },
+            new object[] { " <abc>>>", CreateStringToken("\u00AB\u00C0", 1) },
+            new object[] { " <abc>/a", CreateStringToken("\u00AB\u00C0", 1) },
+            new object[] { " <abc>%a", CreateStringToken("\u00AB\u00C0", 1) },
+
+            new object[] { " /abc]", CreateNameToken("abc", 1) },
+            new object[] { " /abc>>", CreateNameToken("abc", 1) },
+            new object[] { " /abc/a", CreateNameToken("abc", 1) },
+            new object[] { " /abc%a", CreateNameToken("abc", 1) },
+        };
+
         private static StringToken CreateStringToken(string value, int startIndex)
         {
             // NOTE: value should only contain 1-byte characters
