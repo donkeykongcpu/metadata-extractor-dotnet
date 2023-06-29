@@ -8,112 +8,6 @@ namespace MetadataExtractor.Tests.Formats.Pdf
     /// <author>Drew Noakes https://drewnoakes.com</author>
     public sealed class PdfTokeniserTest
     {
-        private static Dictionary<string, StringToken[]> _testLiteralStrings = new Dictionary<string, StringToken[]>
-        {
-            { "(This is a string)", new StringToken[] { CreateStringToken("This is a string", 0) } },
-
-            { "(Whitespace   is preserved)", new StringToken[] { CreateStringToken("Whitespace   is preserved", 0) } },
-
-            { "(Strings may contain newlines\r\nand such.)", new StringToken[] { CreateStringToken("Strings may contain newlines\nand such.", 0) } },
-            { "(Strings may contain newlines\rand such.)", new StringToken[] { CreateStringToken("Strings may contain newlines\nand such.", 0) } },
-            { "(Strings may contain newlines\nand such.)", new StringToken[] { CreateStringToken("Strings may contain newlines\nand such.", 0) } },
-
-            { "(Strings may contain newlines\r\n\r\nand such.)", new StringToken[] { CreateStringToken("Strings may contain newlines\n\nand such.", 0) } },
-            { "(Strings may contain newlines\r\rand such.)", new StringToken[] { CreateStringToken("Strings may contain newlines\n\nand such.", 0) } },
-            { "(Strings may contain newlines\n\nand such.)", new StringToken[] { CreateStringToken("Strings may contain newlines\n\nand such.", 0) } },
-
-            { "(Strings may contain balanced parentheses ( ) and special characters (*!&}^% and so on).)",
-                new StringToken[] { CreateStringToken("Strings may contain balanced parentheses ( ) and special characters (*!&}^% and so on).", 0) } },
-
-            { "()", new StringToken[] { CreateStringToken("", 0) } },
-
-            { "(It has zero (0) length.)", new StringToken[] { CreateStringToken("It has zero (0) length.", 0) } },
-
-            { @"( \n \r \t \b \f \( \) \\ \123 \x )", new StringToken[] { CreateStringToken(" \u000A \u000D \u0009 \u0008 \u000C \u0028 \u0029 \u005C \u0053 x ", 0) } },
-
-            { "(These \\\r\ntwo strings \\\rare the same\\\n.)", new StringToken[] { CreateStringToken("These two strings are the same.", 0) } },
-
-            { "(This string has an end-of-line at the end of it.\n)", new StringToken[] { CreateStringToken("This string has an end-of-line at the end of it.\n", 0) } },
-            { @"(So does this one.\n)", new StringToken[] { CreateStringToken("So does this one.\n", 0) } },
-
-            { @"(This string contains \245two octal characters\307.)", new StringToken[] { CreateStringToken("This string contains \u00A5two octal characters\u00C7.", 0) } },
-            { @"(High-order overflow (\765) is ignored.)", new StringToken[] { CreateStringToken("High-order overflow (\u00F5) is ignored.", 0) } },
-            { @"(The literal (\0053) denotes a string containing two characters, \005 (Control-E) followed by the digit 3)",
-                new StringToken[] { CreateStringToken("The literal (\u00053) denotes a string containing two characters, \u0005 (Control-E) followed by the digit 3", 0) } },
-            { @"(Both (\053) and (\53) denote strings containing the single character \053, a plus sign (+).)",
-                new StringToken[] { CreateStringToken("Both (\u002B) and (\u002B) denote strings containing the single character \u002B, a plus sign (+).", 0) } },
-
-            { " (string)", new StringToken[] { CreateStringToken("string", 1) } },
-            { " \n(string)", new StringToken[] { CreateStringToken("string", 2) } },
-            { " \r\n(string)", new StringToken[] { CreateStringToken("string", 3) } },
-            { " \r\n (string)", new StringToken[] { CreateStringToken("string", 4) } },
-        };
-
-        private static Dictionary<string, StringToken[]> _testHexadecimalStrings = new Dictionary<string, StringToken[]>
-        {
-            { "<4E6F762073686D6F7A>", new StringToken[] { CreateStringToken("\u004E\u006F\u0076\u0020\u0073\u0068\u006D\u006F\u007A", 0) } },
-
-            { "<57 68 69 74 65 73 70 61 63 65 20 69 73 20 69 67 6E 6F 72 65 64>", new StringToken[] { CreateStringToken("Whitespace is ignored", 0) } },
-
-            { "<901FA3>", new StringToken[] { CreateStringToken("\u0090\u001F\u00A3", 0) } },
-            { "<901FA>", new StringToken[] { CreateStringToken("\u0090\u001F\u00A0", 0) } },
-
-            { " <0000>", new StringToken[] { CreateStringToken("\0\0", 1) } },
-            { " \n<0000>", new StringToken[] { CreateStringToken("\0\0", 2) } },
-            { " \r\n<0000>", new StringToken[] { CreateStringToken("\0\0", 3) } },
-            { " \r\n <0000>", new StringToken[] { CreateStringToken("\0\0", 4) } },
-        };
-
-        private static Dictionary<string, NameToken[]> _testNames = new Dictionary<string, NameToken[]>
-        {
-            { "/Name1", new NameToken[] { CreateNameToken("Name1", 0) } },
-            { "/ASomewhatLongerName", new NameToken[] { CreateNameToken("ASomewhatLongerName", 0) } },
-            { "/A;Name_With-Various***Characters?", new NameToken[] { CreateNameToken("A;Name_With-Various***Characters?", 0) } },
-            { "/1.2", new NameToken[] { CreateNameToken("1.2", 0) } },
-            { "/$$", new NameToken[] { CreateNameToken("$$", 0) } },
-            { "/@pattern", new NameToken[] { CreateNameToken("@pattern", 0) } },
-            { "/.notdef", new NameToken[] { CreateNameToken(".notdef", 0) } },
-            { "/Lime#20Green", new NameToken[] { CreateNameToken("Lime Green", 0) } },
-            { "/paired#28#29parentheses", new NameToken[] { CreateNameToken("paired()parentheses", 0) } },
-            { "/The_Key_of_F#23_Minor", new NameToken[] { CreateNameToken("The_Key_of_F#_Minor", 0) } },
-            { "/A#42", new NameToken[] { CreateNameToken("AB", 0) } },
-
-            { "/", new NameToken[] { CreateNameToken("", 0) } },
-
-            { " /Name", new NameToken[] { CreateNameToken("Name", 1) } },
-            { " \n/Name", new NameToken[] { CreateNameToken("Name", 2) } },
-            { " \r\n/Name", new NameToken[] { CreateNameToken("Name", 3) } },
-            { " \r\n /Name", new NameToken[] { CreateNameToken("Name", 4) } },
-        };
-
-        private static Dictionary<string, CommentToken[]> _testComments = new Dictionary<string, CommentToken[]>
-        {
-            { "%comment", new CommentToken[] { CreateCommentToken("comment", 0) } },
-            { "% comment", new CommentToken[] { CreateCommentToken(" comment", 0) } },
-
-            { " %comment\r\n", new CommentToken[] { CreateCommentToken("comment", 1) } },
-            { " %comment\r", new CommentToken[] { CreateCommentToken("comment", 1) } },
-            { " %comment\n", new CommentToken[] { CreateCommentToken("comment", 1) } },
-
-            { " \n%comment\n", new CommentToken[] { CreateCommentToken("comment", 2) } },
-            { " \r\n%comment\n", new CommentToken[] { CreateCommentToken("comment", 3) } },
-            { " \r\n %comment\n", new CommentToken[] { CreateCommentToken("comment", 4) } },
-        };
-
-        private static Dictionary<string, HeaderCommentToken[]> _testHeaderComments = new Dictionary<string, HeaderCommentToken[]>
-        {
-            { "%PDF-1.0", new HeaderCommentToken[] { CreateHeaderCommentToken("PDF-1.0", "1.0", 0) } },
-            { "%PDF-1.1 ", new HeaderCommentToken[] { CreateHeaderCommentToken("PDF-1.1 ", "1.1", 0) } },
-            { "%PDF-1.2\r\n", new HeaderCommentToken[] { CreateHeaderCommentToken("PDF-1.2", "1.2", 0) } },
-            { "%PDF-1.3\r", new HeaderCommentToken[] { CreateHeaderCommentToken("PDF-1.3", "1.3", 0) } },
-            { "%PDF-1.4\n", new HeaderCommentToken[] { CreateHeaderCommentToken("PDF-1.4", "1.4", 0) } },
-            { "%PDF-1.5 \n", new HeaderCommentToken[] { CreateHeaderCommentToken("PDF-1.5 ", "1.5", 0) } },
-            { "%PDF-1.6", new HeaderCommentToken[] { CreateHeaderCommentToken("PDF-1.6", "1.6", 0) } },
-            { "%PDF-1.7", new HeaderCommentToken[] { CreateHeaderCommentToken("PDF-1.7", "1.7", 0) } },
-            { "%PDF-2.0", new HeaderCommentToken[] { CreateHeaderCommentToken("PDF-2.0", "2.0", 0) } },
-        };
-
-
         private static PdfTokeniser GetTokeniserForInput(string input)
         {
             StringByteProviderSource byteSource = new StringByteProviderSource(input, 0, ExtractionDirection.Forward);
@@ -147,22 +41,51 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             public int GetHashCode(Token token) => token.Value.GetHashCode();
         }
 
-        [Fact]
-        public void TestLiteralStrings()
+        [Theory]
+        [InlineData("(This is a string)", "This is a string", 0)]
+        [InlineData("(Whitespace   is preserved)", "Whitespace   is preserved", 0)]
+        [InlineData("(Strings may contain newlines\r\nand such.)", "Strings may contain newlines\nand such.", 0)]
+        [InlineData("(Strings may contain newlines\rand such.)", "Strings may contain newlines\nand such.", 0)]
+        [InlineData("(Strings may contain newlines\nand such.)", "Strings may contain newlines\nand such.", 0)]
+        [InlineData("(Strings may contain newlines\r\n\r\nand such.)", "Strings may contain newlines\n\nand such.", 0)]
+        [InlineData("(Strings may contain newlines\r\rand such.)", "Strings may contain newlines\n\nand such.", 0)]
+        [InlineData("(Strings may contain newlines\n\nand such.)", "Strings may contain newlines\n\nand such.", 0)]
+        [InlineData(
+            "(Strings may contain balanced parentheses ( ) and special characters (*!&}^% and so on).)",
+            "Strings may contain balanced parentheses ( ) and special characters (*!&}^% and so on).",
+            0
+        )]
+        [InlineData("()", "", 0)]
+        [InlineData("(It has zero (0) length.)", "It has zero (0) length.", 0)]
+        [InlineData(@"( \n \r \t \b \f \( \) \\ \123 \x )", " \u000A \u000D \u0009 \u0008 \u000C \u0028 \u0029 \u005C \u0053 x ", 0)]
+        [InlineData("(These \\\r\ntwo strings \\\rare the same\\\n.)", "These two strings are the same.", 0)]
+        [InlineData("(This string has an end-of-line at the end of it.\n)", "This string has an end-of-line at the end of it.\n", 0)]
+        [InlineData(@"(This string contains \245two octal characters\307.)", "This string contains \u00A5two octal characters\u00C7.", 0)]
+        [InlineData(@"(High-order overflow (\765) is ignored.)", "High-order overflow (\u00F5) is ignored.", 0)]
+        [InlineData(
+            @"(The literal (\0053) denotes a string containing two characters, \005 (Control-E) followed by the digit 3)",
+            "The literal (\u00053) denotes a string containing two characters, \u0005 (Control-E) followed by the digit 3",
+            0
+        )]
+        [InlineData(
+            @"(Both (\053) and (\53) denote strings containing the single character \053, a plus sign (+).)",
+            "Both (\u002B) and (\u002B) denote strings containing the single character \u002B, a plus sign (+).",
+            0
+        )]
+        [InlineData(" (string)", "string", 1)]
+        [InlineData(" \n(string)", "string", 2)]
+        [InlineData(" \r\n(string)", "string", 3)]
+        [InlineData(" \r\n (string)", "string", 4)]
+        public void TestLiteralStrings(string actual, string expected, int startIndex)
         {
-            foreach (string input in _testLiteralStrings.Keys)
-            {
-                Token[] actual = GetTokeniserForInput(input).Tokenise().ToArray();
+            Token[] tokens = GetTokeniserForInput(actual).Tokenise().ToArray();
 
-                Token[] expected = _testLiteralStrings[input];
+            Assert.Single(tokens);
 
-                Assert.Equal(expected.Length, actual.Length);
+            Token actualToken = tokens.First();
+            Token expectedToken = CreateStringToken(expected, startIndex);
 
-                for (int i = 0; i < actual.Length; i++)
-                {
-                    Assert.Equal(expected[i], actual[i], new TokenEqualityComparer());
-                }
-            }
+            Assert.Equal(expectedToken, actualToken, new TokenEqualityComparer());
         }
 
         [Fact]
@@ -174,22 +97,25 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             });
         }
 
-        [Fact]
-        public void TestHexadecimalStrings()
+        [Theory]
+        [InlineData("<4E6F762073686D6F7A>", "\u004E\u006F\u0076\u0020\u0073\u0068\u006D\u006F\u007A", 0)]
+        [InlineData("<57 68 69 74 65 73 70 61 63 65 20 69 73 20 69 67 6E 6F 72 65 64>", "Whitespace is ignored", 0)]
+        [InlineData("<901FA3>", "\u0090\u001F\u00A3", 0)]
+        [InlineData("<901FA>", "\u0090\u001F\u00A0", 0)] // odd number of hex chars appends zero
+        [InlineData(" <0000>", "\0\0", 1)]
+        [InlineData(" \n<0000>", "\0\0", 2)]
+        [InlineData(" \r\n<0000>", "\0\0", 3)]
+        [InlineData(" \r\n <0000>", "\0\0", 4)]
+        public void TestHexadecimalStrings(string actual, string expected, int startIndex)
         {
-            foreach (string input in _testHexadecimalStrings.Keys)
-            {
-                Token[] actual = GetTokeniserForInput(input).Tokenise().ToArray();
+            Token[] tokens = GetTokeniserForInput(actual).Tokenise().ToArray();
 
-                Token[] expected = _testHexadecimalStrings[input];
+            Assert.Single(tokens);
 
-                Assert.Equal(expected.Length, actual.Length);
+            Token actualToken = tokens.First();
+            Token expectedToken = CreateStringToken(expected, startIndex);
 
-                for (int i = 0; i < actual.Length; i++)
-                {
-                    Assert.Equal(expected[i], actual[i], new TokenEqualityComparer());
-                }
-            }
+            Assert.Equal(expectedToken, actualToken, new TokenEqualityComparer());
         }
 
         [Fact]
@@ -201,66 +127,76 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             });
         }
 
-        [Fact]
-        public void TestNames()
+        [Theory]
+        [InlineData("/Name1", "Name1", 0)]
+        [InlineData("/ASomewhatLongerName", "ASomewhatLongerName", 0)]
+        [InlineData("/A;Name_With-Various***Characters?", "A;Name_With-Various***Characters?", 0)]
+        [InlineData("/1.2", "1.2", 0)]
+        [InlineData("/$$", "$$", 0)]
+        [InlineData("/@pattern", "@pattern", 0)]
+        [InlineData("/.notdef", ".notdef", 0)]
+        [InlineData("/Lime#20Green", "Lime Green", 0)]
+        [InlineData("/paired#28#29parentheses", "paired()parentheses", 0)]
+        [InlineData("/The_Key_of_F#23_Minor", "The_Key_of_F#_Minor", 0)]
+        [InlineData("/A#42", "AB", 0)]
+        [InlineData("/", "", 0)]
+        [InlineData(" /Name", "Name", 1)]
+        [InlineData(" \n/Name", "Name", 2)]
+        [InlineData(" \r\n/Name", "Name", 3)]
+        [InlineData(" \r\n /Name", "Name", 4)]
+        public void TestNames(string actual, string expected, int startIndex)
         {
-            foreach (string input in _testNames.Keys)
-            {
-                Token[] actual = GetTokeniserForInput(input).Tokenise().ToArray();
+            Token[] tokens = GetTokeniserForInput(actual).Tokenise().ToArray();
 
-                Token[] expected = _testNames[input];
+            Assert.Single(tokens);
 
-                Assert.Equal(expected.Length, actual.Length);
+            Token actualToken = tokens.First();
+            Token expectedToken = CreateNameToken(expected, startIndex);
 
-                for (int i = 0; i < actual.Length; i++)
-                {
-                    Assert.Equal(expected[i], actual[i], new TokenEqualityComparer());
-                }
-            }
+            Assert.Equal(expectedToken, actualToken, new TokenEqualityComparer());
         }
 
-        [Fact]
-        public void TestComments()
+        [Theory]
+        [InlineData("%comment", "comment", 0)]
+        [InlineData("% comment", " comment", 0)]
+        [InlineData(" %comment\r\n", "comment", 1)]
+        [InlineData(" %comment\r", "comment", 1)]
+        [InlineData(" %comment\n", "comment", 1)]
+        [InlineData(" \n%comment\n", "comment", 2)]
+        [InlineData(" \r\n%comment\n", "comment", 3)]
+        [InlineData(" \r\n %comment\n", "comment", 4)]
+        public void TestComments(string actual, string expected, int startIndex)
         {
-            foreach (string input in _testComments.Keys)
-            {
-                Token[] actual = GetTokeniserForInput(input).Tokenise().ToArray();
+            Token[] tokens = GetTokeniserForInput(actual).Tokenise().ToArray();
 
-                Token[] expected = _testComments[input];
+            Assert.Single(tokens);
 
-                Assert.Equal(expected.Length, actual.Length);
+            Token actualToken = tokens.First();
+            Token expectedToken = CreateCommentToken(expected, startIndex);
 
-                for (int i = 0; i < actual.Length; i++)
-                {
-                    Assert.Equal(expected[i], actual[i], new TokenEqualityComparer());
-                }
-            }
+            Assert.Equal(expectedToken, actualToken, new TokenEqualityComparer());
         }
 
-        [Fact]
-        public void TestHeaderComments()
+        [Theory]
+        [InlineData("%PDF-1.0", "PDF-1.0", "1.0", 0)]
+        [InlineData("%PDF-1.1 ", "PDF-1.1 ", "1.1", 0)]
+        [InlineData("%PDF-1.2\r\n", "PDF-1.2", "1.2", 0)]
+        [InlineData("%PDF-1.3\r", "PDF-1.3", "1.3", 0)]
+        [InlineData("%PDF-1.4\n", "PDF-1.4", "1.4", 0)]
+        [InlineData("%PDF-1.5 \n", "PDF-1.5 ", "1.5", 0)]
+        [InlineData("%PDF-1.6", "PDF-1.6", "1.6", 0)]
+        [InlineData("%PDF-1.7", "PDF-1.7", "1.7", 0)]
+        [InlineData("%PDF-2.0", "PDF-2.0", "2.0", 0)]
+        public void TestHeaderComments(string actual, string expectedValue, string expectedVersion, int startIndex)
         {
-            foreach (string input in _testHeaderComments.Keys)
-            {
-                Token[] actual = GetTokeniserForInput(input).Tokenise().ToArray();
+            Token[] tokens = GetTokeniserForInput(actual).Tokenise().ToArray();
 
-                HeaderCommentToken[] expected = _testHeaderComments[input];
+            Assert.Single(tokens);
 
-                Assert.Equal(expected.Length, actual.Length);
+            Token actualToken = tokens.First();
+            Token expectedToken = CreateHeaderCommentToken(expectedValue, expectedVersion, startIndex);
 
-                Assert.True(actual.All(token => token is HeaderCommentToken));
-
-                var headerTokens = actual.Cast<HeaderCommentToken>().ToArray();
-
-                for (int i = 0; i < actual.Length; i++)
-                {
-                    Assert.Equal(expected[i], headerTokens[i], new TokenEqualityComparer());
-
-                    Assert.Equal(expected[i].Version, headerTokens[i].Version);
-
-                    Assert.Equal(expected[i].DecimalVersion, headerTokens[i].DecimalVersion);
-                }
-            }
+            Assert.Equal(expectedToken, actualToken, new TokenEqualityComparer());
         }
 
         [Fact]
