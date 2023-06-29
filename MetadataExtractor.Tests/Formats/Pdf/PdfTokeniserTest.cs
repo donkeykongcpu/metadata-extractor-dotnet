@@ -657,6 +657,39 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             Assert.NotEqual(CreateHeaderCommentToken("abc", "1.0", 0), CreateHeaderCommentToken("abc", "1.0", 1), comparer);
         }
 
+        [Theory]
+        [MemberData(nameof(TokensFollowedByWhitespace))]
+        public void TestTokensFollowedByWhitespace(string input, Token expectedToken)
+        {
+            Token[] tokens = GetTokeniserForInput(input).Tokenise().ToArray();
+
+            Assert.Single(tokens);
+
+            Token actualToken = tokens.First();
+
+            Assert.Equal(expectedToken, actualToken, new TokenEqualityComparer());
+        }
+
+        public static IEnumerable<object[]> TokensFollowedByWhitespace = new List<object[]>
+        {
+            new object[] { " R\t", new IndirectReferenceMarkerToken(1) },
+            new object[] { " obj\t", new IndirectObjectBeginToken(1) },
+            new object[] { " endobj\t", new IndirectObjectEndToken(1) },
+            new object[] { " stream\n$", new StreamBeginToken(1, streamStartIndex: 8) },
+            new object[] { " null\t", new NullToken(1) },
+            new object[] { " true\t", new BooleanToken(true, 1) },
+            new object[] { " 123\t", CreateNumericIntegerToken(123, 1) },
+            new object[] { " 3.14\t", CreateNumericRealToken(3.14m, 1) },
+            new object[] { " [\t", new ArrayBeginToken(1) },
+            new object[] { " ]\t", new ArrayEndToken(1) },
+            new object[] { " <<\t", new DictionaryBeginToken(1) },
+            new object[] { " >>\t", new DictionaryEndToken(1) },
+            new object[] { " (abc\t)\t", CreateStringToken("abc\t", 1) },
+            new object[] { " /abc\t", CreateNameToken("abc", 1) },
+            new object[] { " %abc\t\n", CreateCommentToken("abc\t", 1) },
+            new object[] { " %PDF-2.0\n", CreateHeaderCommentToken("PDF-2.0", "2.0", 1) },
+            new object[] { " %\u00C3\u00C4\u00C5\u00C6\n", new BinaryIndicatorCommentToken(new byte[] { 0xC3, 0xC4, 0xC5, 0xC6 }, 1) },
+        };
         private static StringToken CreateStringToken(string value, int startIndex)
         {
             // NOTE: value should only contain 1-byte characters
@@ -684,6 +717,11 @@ namespace MetadataExtractor.Tests.Formats.Pdf
         private static NumericIntegerToken CreateNumericIntegerToken(int value, int startIndex)
         {
             return new NumericIntegerToken(value, value.ToString().ToCharArray().Select(c => (byte)c).ToArray(), startIndex);
+        }
+
+        private static NumericRealToken CreateNumericRealToken(decimal value, int startIndex)
+        {
+            return new NumericRealToken(value, value.ToString().ToCharArray().Select(c => (byte)c).ToArray(), startIndex);
         }
     }
 }
