@@ -143,12 +143,12 @@ namespace MetadataExtractor.Formats.Pdf
         }
 
         public PdfStream(uint objectNumber, ushort generationNumber, PdfDictionary streamDictionary, int streamStartIndex)
-        : this(new ObjectIdentifier(objectNumber, generationNumber), streamDictionary, streamStartIndex)
+            : this(new ObjectIdentifier(objectNumber, generationNumber), streamDictionary, streamStartIndex)
         {
         }
 
         public PdfStream(int objectNumber, int generationNumber, PdfDictionary streamDictionary, int streamStartIndex)
-        : this(new ObjectIdentifier(objectNumber, generationNumber), streamDictionary, streamStartIndex)
+            : this(new ObjectIdentifier(objectNumber, generationNumber), streamDictionary, streamStartIndex)
         {
         }
     }

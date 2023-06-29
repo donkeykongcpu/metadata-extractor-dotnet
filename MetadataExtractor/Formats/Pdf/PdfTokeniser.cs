@@ -7,7 +7,11 @@ namespace MetadataExtractor.Formats.Pdf
 {
     public class PdfTokeniser
     {
-        private static byte[] HeaderCommentBytes { get; } = Encoding.ASCII.GetBytes("PDF-");
+        private static readonly byte[] _whitespaceChars = new byte[] { 0x00, 0x09, 0x0A, 0x0C, 0x0D, 0x20 };
+
+        private static readonly byte[] _delimiterChars = new byte[] { 0x28, 0x29, 0x3C, 0x3E, 0x5B, 0x5D, 0x7B, 0x7D, 0x2F, 0x25 };
+
+        private static readonly byte[] _headerCommentBytes = Encoding.ASCII.GetBytes("PDF-");
 
         private readonly ItemProvider<byte> _byteProvider;
 
@@ -87,7 +91,7 @@ namespace MetadataExtractor.Formats.Pdf
             byte[] tokenBytes = Encoding.ASCII.GetBytes(asciiToken);
             byte byteAfterLast = _byteProvider.PeekNextItem(tokenBytes.Length);
             // must be followed by whitespace (or EOF), array marker, dictionary end marker or name marker
-            if (!PdfReader.WhitespaceChars.Contains(byteAfterLast)
+            if (!_whitespaceChars.Contains(byteAfterLast)
                 && byteAfterLast != (byte)'[' && byteAfterLast != (byte)']'
                 && byteAfterLast != (byte)'<' && byteAfterLast != (byte)'>'
                 && byteAfterLast != (byte)'/'
@@ -132,7 +136,7 @@ namespace MetadataExtractor.Formats.Pdf
                     matched = true;
                     break;
                 }
-                else if (PdfReader.WhitespaceChars.Contains(_byteProvider.PeekNextItem(0)))
+                else if (_whitespaceChars.Contains(_byteProvider.PeekNextItem(0)))
                 {
                     matched = true;
                     _byteProvider.Consume(1);
@@ -463,16 +467,16 @@ namespace MetadataExtractor.Formats.Pdf
                 if (!_byteProvider.HasNextItem || MatchEndOfLine())
                 {
                     byte[] byteArray = bytes.ToArray();
-                    if (byteArray.Length >= HeaderCommentBytes.Length + 3 && byteArray.RegionEquals(0, HeaderCommentBytes.Length, HeaderCommentBytes))
+                    if (byteArray.Length >= _headerCommentBytes.Length + 3 && byteArray.RegionEquals(0, _headerCommentBytes.Length, _headerCommentBytes))
                     {
                         // %PDF-1.N signifies a PDF File Header, where N is a digit between 0 and 7
                         // %PDF-2.0 signifies a PDF File Header for version 2.0
-                        if (TryDecimalToInt(byteArray[HeaderCommentBytes.Length]) >= 0
-                            && byteArray[HeaderCommentBytes.Length + 1] == (byte)'.'
-                            && TryDecimalToInt(byteArray[HeaderCommentBytes.Length + 2]) >= 0
+                        if (TryDecimalToInt(byteArray[_headerCommentBytes.Length]) >= 0
+                            && byteArray[_headerCommentBytes.Length + 1] == (byte)'.'
+                            && TryDecimalToInt(byteArray[_headerCommentBytes.Length + 2]) >= 0
                             )
                         {
-                            token = new HeaderCommentToken(byteArray, Encoding.ASCII.GetString(byteArray.Skip(HeaderCommentBytes.Length).Take(3).ToArray()), currentIndex);
+                            token = new HeaderCommentToken(byteArray, Encoding.ASCII.GetString(byteArray.Skip(_headerCommentBytes.Length).Take(3).ToArray()), currentIndex);
                             return true; // success!
                         }
                     }
