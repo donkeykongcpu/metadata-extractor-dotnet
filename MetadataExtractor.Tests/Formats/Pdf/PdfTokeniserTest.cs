@@ -41,10 +41,16 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                         && commentToken1.StartIndex == commentToken2.StartIndex
                         && commentToken1.Value.EqualTo(commentToken2.Value);
                 }
-                else if (token1 is not HeaderCommentToken && token2 is not HeaderCommentToken)
+                else if (token1 is StreamBeginToken streamToken1 && token2 is StreamBeginToken streamToken2)
                 {
-                    return token1.Type == token2.Type
-                       && token1.StartIndex == token2.StartIndex
+                    return streamToken1.Type == streamToken2.Type
+                        && streamToken1.StreamStartIndex == streamToken2.StreamStartIndex
+                        && streamToken1.StartIndex == streamToken2.StartIndex
+                        && streamToken1.Value.EqualTo(streamToken2.Value);
+                }
+                else if (token1.Type == token2.Type)
+                {
+                    return token1.StartIndex == token2.StartIndex
                        && token1.Value.EqualTo(token2.Value);
                 }
                 else
@@ -241,13 +247,13 @@ namespace MetadataExtractor.Tests.Formats.Pdf
         {
             string input = " %\u00E2\u00E3\u00CF\u00D3\r\n";
 
-            Token[] actual = GetTokeniserForInput(input).Tokenise().ToArray();
+            Token[] tokens = GetTokeniserForInput(input).Tokenise().ToArray();
 
-            Assert.True(actual.Length == 1);
+            Assert.Single(tokens);
 
-            Assert.True(actual[0] is BinaryIndicatorCommentToken);
+            Token expected = new BinaryIndicatorCommentToken(new byte[] { 0xE2, 0xE3, 0xCF, 0xD3 }, 1);
 
-            Assert.Equal(1, actual[0].StartIndex);
+            Assert.Equal(expected, tokens.First(), new TokenEqualityComparer());
         }
 
         [Fact]
@@ -255,13 +261,13 @@ namespace MetadataExtractor.Tests.Formats.Pdf
         {
             string input = " null";
 
-            Token[] actual = GetTokeniserForInput(input).Tokenise().ToArray();
+            Token[] tokens = GetTokeniserForInput(input).Tokenise().ToArray();
 
-            Assert.True(actual.Length == 1);
+            Assert.Single(tokens);
 
-            Assert.True(actual[0] is NullToken);
+            Token expected = new NullToken(1);
 
-            Assert.Equal(1, actual[0].StartIndex);
+            Assert.Equal(expected, tokens.First(), new TokenEqualityComparer());
         }
 
         [Fact]
@@ -269,15 +275,13 @@ namespace MetadataExtractor.Tests.Formats.Pdf
         {
             string input = "  true";
 
-            Token[] actual = GetTokeniserForInput(input).Tokenise().ToArray();
+            Token[] tokens = GetTokeniserForInput(input).Tokenise().ToArray();
 
-            Assert.True(actual.Length == 1);
+            Assert.Single(tokens);
 
-            Assert.True(actual[0] is BooleanToken);
+            Token expected = new BooleanToken(true, 2);
 
-            Assert.True((actual[0] as BooleanToken)!.BooleanValue);
-
-            Assert.Equal(2, actual[0].StartIndex);
+            Assert.Equal(expected, tokens.First(), new TokenEqualityComparer());
         }
 
         [Fact]
@@ -285,76 +289,64 @@ namespace MetadataExtractor.Tests.Formats.Pdf
         {
             string input = " \r\n false";
 
-            Token[] actual = GetTokeniserForInput(input).Tokenise().ToArray();
+            Token[] tokens = GetTokeniserForInput(input).Tokenise().ToArray();
 
-            Assert.True(actual.Length == 1);
+            Assert.Single(tokens);
 
-            Assert.True(actual[0] is BooleanToken);
+            Token expected = new BooleanToken(false, 4);
 
-            Assert.False((actual[0] as BooleanToken)!.BooleanValue);
-
-            Assert.Equal(4, actual[0].StartIndex);
+            Assert.Equal(expected, tokens.First(), new TokenEqualityComparer());
         }
 
         [Fact]
         public void TestNumericIntegers()
         {
             string input = " 123 43445 +17 -98 0";
+            //              01234567890123456789
 
             Token[] actual = GetTokeniserForInput(input).Tokenise().ToArray();
 
-            Assert.True(actual.Length == input.Split(' ').Where(x => x.Trim() != string.Empty).Count());
+            Token[] expected = new Token[]
+            {
+                new NumericIntegerToken(123, new byte[] { (byte)'1', (byte)'2', (byte)'3' }, 1),
+                new NumericIntegerToken(43445, new byte[] { (byte)'4', (byte)'3', (byte)'4', (byte)'4', (byte)'5' }, 5),
+                new NumericIntegerToken(17, new byte[] { (byte)'+', (byte)'1', (byte)'7' }, 11),
+                new NumericIntegerToken(-98, new byte[] { (byte)'-', (byte)'9', (byte)'8' }, 15),
+                new NumericIntegerToken(0, new byte[] { (byte)'0' }, 19),
+            };
 
-            Assert.True(actual.All(token => token is NumericIntegerToken));
+            Assert.Equal(expected.Length, actual.Length);
 
-            var integerTokens = actual.Cast<NumericIntegerToken>().ToArray();
-
-            Assert.Equal(123, integerTokens[0].IntegerValue);
-            Assert.Equal(1, integerTokens[0].StartIndex);
-
-            Assert.Equal(43445, integerTokens[1].IntegerValue);
-            Assert.Equal(5, integerTokens[1].StartIndex);
-
-            Assert.Equal(17, integerTokens[2].IntegerValue);
-            Assert.Equal(11, integerTokens[2].StartIndex);
-
-            Assert.Equal(-98, integerTokens[3].IntegerValue);
-            Assert.Equal(15, integerTokens[3].StartIndex);
-
-            Assert.Equal(0, integerTokens[4].IntegerValue);
-            Assert.Equal(19, integerTokens[4].StartIndex);
+            for (int i = 0; i < actual.Length; i++)
+            {
+                Assert.Equal(expected[i], actual[i], new TokenEqualityComparer());
+            }
         }
 
         [Fact]
         public void TestNumericReals()
         {
             string input = " 34.5 -3.62 +123.6 4. -.002 0.0";
+            //              01234567890123456789012345678
 
             Token[] actual = GetTokeniserForInput(input).Tokenise().ToArray();
 
-            Assert.True(actual.Length == input.Split(' ').Where(x => x.Trim() != string.Empty).Count());
+            Token[] expected = new Token[]
+             {
+                new NumericRealToken(34.5m, new byte[] { (byte)'3', (byte)'4', (byte)'.', (byte)'5' }, 1),
+                new NumericRealToken(-3.62m, new byte[] { (byte)'-', (byte)'3', (byte)'.', (byte)'6', (byte)'2' }, 6),
+                new NumericRealToken(123.6m, new byte[] { (byte)'+', (byte)'1', (byte)'2', (byte)'3', (byte)'.', (byte)'6' }, 12),
+                new NumericRealToken(4.0m, new byte[] { (byte)'4', (byte)'.' }, 19),
+                new NumericRealToken(-0.002m, new byte[] { (byte)'-', (byte)'.', (byte)'0', (byte)'0', (byte)'2' }, 22),
+                new NumericRealToken(0.0m, new byte[] { (byte)'0', (byte)'.', (byte)'0' }, 28),
+             };
 
-            Assert.True(actual.All(token => token is NumericRealToken));
+            Assert.Equal(expected.Length, actual.Length);
 
-            var realTokens = actual.Cast<NumericRealToken>().ToArray();
-
-            Assert.Equal("34.5", realTokens[0].RealValue.ToString());
-            Assert.Equal(1, realTokens[0].StartIndex);
-
-            Assert.Equal("-3.62", realTokens[1].RealValue.ToString());
-            Assert.Equal(6, realTokens[1].StartIndex);
-
-            Assert.Equal("123.6", realTokens[2].RealValue.ToString());
-            Assert.Equal(12, realTokens[2].StartIndex);
-
-            Assert.Equal("4", realTokens[3].RealValue.ToString());
-            Assert.Equal(19, realTokens[3].StartIndex);
-
-            Assert.Equal("-0.002", realTokens[4].RealValue.ToString());
-            Assert.Equal(22, realTokens[4].StartIndex);
-
-            Assert.Equal("0.0", realTokens[5].RealValue.ToString());
-            Assert.Equal(28, realTokens[5].StartIndex);
+            for (int i = 0; i < actual.Length; i++)
+            {
+                Assert.Equal(expected[i], actual[i], new TokenEqualityComparer());
+            }
         }
 
         [Fact]
@@ -416,11 +408,6 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             for (int i = 0; i < actual.Length; i++)
             {
                 Assert.Equal(expected[i], actual[i], new TokenEqualityComparer());
-
-                if (expected[i] is StreamBeginToken)
-                {
-                    Assert.Equal(((StreamBeginToken)expected[i]).StreamStartIndex, ((StreamBeginToken)actual[i]).StreamStartIndex);
-                }
             }
         }
 
@@ -449,11 +436,6 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             for (int i = 0; i < actual.Length; i++)
             {
                 Assert.Equal(expected[i], actual[i], new TokenEqualityComparer());
-
-                if (expected[i] is StreamBeginToken)
-                {
-                    Assert.Equal(((StreamBeginToken)expected[i]).StreamStartIndex, ((StreamBeginToken)actual[i]).StreamStartIndex);
-                }
             }
         }
 
@@ -655,6 +637,11 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             Assert.NotEqual(CreateHeaderCommentToken("abc", "1.0", 0), CreateHeaderCommentToken("abcd", "1.0", 0), comparer);
             Assert.NotEqual(CreateHeaderCommentToken("abc", "1.0", 0), CreateHeaderCommentToken("abc", "1.1", 0), comparer);
             Assert.NotEqual(CreateHeaderCommentToken("abc", "1.0", 0), CreateHeaderCommentToken("abc", "1.0", 1), comparer);
+
+            // StreamBeginToken
+            Assert.Equal(new StreamBeginToken(1, 2), new StreamBeginToken(1, 2), comparer);
+            Assert.NotEqual(new StreamBeginToken(1, 2), new StreamBeginToken(0, 2), comparer);
+            Assert.NotEqual(new StreamBeginToken(1, 2), new StreamBeginToken(1, 0), comparer);
         }
 
         [Theory]
