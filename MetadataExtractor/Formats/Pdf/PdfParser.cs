@@ -190,6 +190,9 @@ namespace MetadataExtractor.Formats.Pdf
                     {
                         PdfStream pdfStream = new PdfStream(indirectObject.Identifier, streamDictionary, streamBeginToken.StreamStartIndex);
                         parseContext.ReplaceIndirectObjectValue(pdfStream);
+                        // the stream most likely contains invalid tokens, so tokenisation ends here
+                        // the "stream" keyword is followed the stream data then by "endstream",
+                        // which must always be immediately followed by "endobj", meaning the end of the indirect object data
                         parseContext.EndContext("indirect-object");
                         break;
                     }
