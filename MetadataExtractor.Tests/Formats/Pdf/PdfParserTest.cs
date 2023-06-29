@@ -17,7 +17,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             return PdfParser.ParseObject(tokenProvider);
         }
 
-        private class PdfObjectEqualityComparer : IEqualityComparer<PdfObject>
+        private class PdfObjectEqualityComparer : IEqualityComparer<PdfObject?>
         {
             public bool Equals(PdfObject? object1, PdfObject? object2)
             {
@@ -31,67 +31,62 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                     return false;
                 }
 
-                if (object1.Type != object2.Type)
-                {
-                    return false;
-                }
-
-                object? value1 = object1.GetValue();
-
-                object? value2 = object2.GetValue();
-
-                if (value1 is null && value2 is null && object1.Type == "null" && object2.Type == "null")
+                if (object1 is PdfNull && object2 is PdfNull)
                 {
                     return true;
                 }
-                else if (value1 is null || value2 is null)
+                else if (object1 is PdfBoolean boolean1 && object2 is PdfBoolean boolean2)
+                {
+                    return boolean1.Value == boolean2.Value;
+                }
+                else if (object1 is PdfNumericInteger numericInteger1 && object2 is PdfNumericInteger numericInteger2)
+                {
+                    return numericInteger1.Value == numericInteger2.Value;
+                }
+                else if (object1 is PdfNumericReal numericReal1 && object2 is PdfNumericReal numericReal2)
+                {
+                    return numericReal1.Value == numericReal2.Value;
+                }
+                else if (object1 is PdfString string1 && object2 is PdfString string2) // PdfName is subtype of PdfString
+                {
+                    return string1.Value.Bytes.EqualTo(string2.Value.Bytes);
+                }
+                else if (object1 is PdfIndirectReference indirectRef1 && object2 is PdfIndirectReference indirectRef2)
+                {
+                    return indirectRef1.Value.ObjectNumber == indirectRef2.Value.ObjectNumber
+                        && indirectRef1.Value.GenerationNumber == indirectRef2.Value.GenerationNumber;
+                }
+                else if (object1 is PdfArray array1 && object2 is PdfArray array2)
+                {
+                    return array1.Value.SequenceEqual(array2.Value, this);
+                }
+                else if (object1 is PdfDictionary dictionary1 && object2 is PdfDictionary dictionary2)
+                {
+                    return dictionary1.Value.Keys.Count == dictionary2.Value.Keys.Count
+                        && dictionary1.Value.All(item => dictionary2.Value.ContainsKey(item.Key) && Equals(item.Value, dictionary2.Value[item.Key]));
+                }
+                else if (object1 is PdfIndirectObject indirect1 && object2 is PdfIndirectObject indirect2)
+                {
+                    return indirect1.Identifier.ObjectNumber == indirect2.Identifier.ObjectNumber
+                        && indirect1.Identifier.GenerationNumber == indirect2.Identifier.GenerationNumber
+                        && Equals(indirect1.Value, indirect2.Value);
+                }
+                else if (object1 is PdfStream stream1 && object2 is PdfStream stream2)
+                {
+                    return stream1.Identifier.ObjectNumber == stream2.Identifier.ObjectNumber
+                        && stream1.Identifier.GenerationNumber == stream2.Identifier.GenerationNumber
+                        && stream1.StreamStartIndex == stream2.StreamStartIndex
+                        && Equals(stream1.StreamDictionary, stream2.StreamDictionary);
+                }
+                else
                 {
                     return false;
-                }
-
-                switch (object1.Type)
-                {
-                    case "boolean":
-                        return Convert.ToBoolean(value1) == Convert.ToBoolean(value2);
-                    case "numeric-integer":
-                        return Convert.ToInt32(value1) == Convert.ToInt32(value2);
-                    case "numeric-real":
-                        return Convert.ToDecimal(value1) == Convert.ToDecimal(value2);
-                    case "string":
-                    case "name":
-                        return ((StringValue)value1)!.Bytes.EqualTo(((StringValue)value2)!.Bytes);
-                    case "indirect-reference":
-                        return ((ObjectIdentifier)value1).ObjectNumber == ((ObjectIdentifier)value2).ObjectNumber
-                            && ((ObjectIdentifier)value1).GenerationNumber == ((ObjectIdentifier)value2).GenerationNumber;
-                    case "array":
-                        return ((List<PdfObject>)value1).SequenceEqual((List<PdfObject>)value2, this);
-                    case "dictionary":
-                        Dictionary<string, PdfObject> dictionary1 = (Dictionary<string, PdfObject>)value1;
-                        Dictionary<string, PdfObject> dictionary2 = (Dictionary<string, PdfObject>)value2;
-                        return dictionary1.Keys.Count == dictionary2.Keys.Count
-                            && dictionary1.All(item => dictionary2.ContainsKey(item.Key) && Equals(item.Value, dictionary2[item.Key]));
-                    case "indirect-object":
-                        PdfIndirectObject identifier1 = (PdfIndirectObject)object1;
-                        PdfIndirectObject identifier2 = (PdfIndirectObject)object2;
-                        return identifier1.ObjectNumber == identifier2.ObjectNumber
-                            && identifier1.GenerationNumber == identifier2.GenerationNumber
-                            && Equals((PdfObject)value1, (PdfObject)value2);
-                    case "stream":
-                        PdfStream stream1 = (PdfStream)object1;
-                        PdfStream stream2 = (PdfStream)object2;
-                        return stream1.StreamStartIndex == stream2.StreamStartIndex
-                            && stream1.StreamLength == stream2.StreamLength
-                            && Equals(stream1.StreamDictionary, stream2.StreamDictionary);
-                    //case "XXX": return XXX;
-                    default: throw new Exception($"Unknown object type: {object1.Type}");
                 }
             }
 
             public int GetHashCode(PdfObject obj)
             {
-                object? value = obj.GetValue();
-
-                return value is null ? 0 : value.GetHashCode();
+                return obj.GetHashCode();
             }
         }
 
@@ -450,8 +445,116 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             });
         }
 
+        [Fact]
+        public void TestEquality()
+        {
+            PdfObjectEqualityComparer comparer = new PdfObjectEqualityComparer();
 
+            PdfBoolean boolean = new PdfBoolean(true);
 
+            Assert.Equal(boolean, boolean, comparer);
 
+#pragma warning disable xUnit2003 // Do not use equality check to test for null value
+#pragma warning disable xUnit2000 // Constants and literals should be the expected argument
+            Assert.NotEqual(null, boolean, comparer);
+            Assert.NotEqual(boolean, null, comparer);
+#pragma warning restore xUnit2000 // Constants and literals should be the expected argument
+#pragma warning restore xUnit2003 // Do not use equality check to test for null value
+
+            // PdfNull
+            Assert.Equal(new PdfNull(), new PdfNull(), comparer);
+            Assert.NotEqual(new PdfNull(), new PdfBoolean(true), comparer);
+
+            // PdfBoolean
+            Assert.Equal(new PdfBoolean(true), new PdfBoolean(true), comparer);
+            Assert.NotEqual(new PdfBoolean(true), new PdfBoolean(false), comparer);
+
+            // PdfNumericInteger
+            Assert.Equal(new PdfNumericInteger(123), new PdfNumericInteger(123), comparer);
+            Assert.NotEqual(new PdfNumericInteger(123), new PdfNumericInteger(234), comparer);
+
+            // PdfNumericReal
+            Assert.Equal(new PdfNumericReal(3.14m), new PdfNumericReal(3.14m), comparer);
+            Assert.NotEqual(new PdfNumericReal(3.14m), new PdfNumericReal(3.1m), comparer);
+
+            // PdfString
+            Assert.Equal(CreatePdfString("abc"), CreatePdfString("abc"), comparer);
+            Assert.NotEqual(CreatePdfString("abc"), CreatePdfString("aBc"), comparer);
+
+            // PdfIndirectReference
+            Assert.Equal(new PdfIndirectReference(123, 456), new PdfIndirectReference(123, 456), comparer);
+            Assert.NotEqual(new PdfIndirectReference(123, 456), new PdfIndirectReference(122, 456), comparer);
+            Assert.NotEqual(new PdfIndirectReference(123, 456), new PdfIndirectReference(123, 455), comparer);
+
+            // PdfArray
+            Assert.Equal(
+                new PdfArray(new List<PdfObject> { new PdfNull(), new PdfBoolean(true), new PdfBoolean(false) }),
+                new PdfArray(new List<PdfObject> { new PdfNull(), new PdfBoolean(true), new PdfBoolean(false) }),
+                comparer
+            );
+            Assert.NotEqual(
+               new PdfArray(new List<PdfObject> { new PdfNull(), new PdfBoolean(true), new PdfBoolean(false) }),
+               new PdfArray(new List<PdfObject> { new PdfNull(), new PdfBoolean(true), new PdfBoolean(false), new PdfNull() }),
+               comparer
+            );
+            Assert.NotEqual(
+               new PdfArray(new List<PdfObject> { new PdfNull(), new PdfBoolean(true), new PdfBoolean(false) }),
+               new PdfArray(new List<PdfObject> { new PdfNull(), new PdfBoolean(true), new PdfBoolean(true) }),
+               comparer
+            );
+
+            // PdfDictionary
+            Assert.Equal(
+                new PdfDictionary(new Dictionary<string, PdfObject> { { "a", new PdfNull() }, { "b", new PdfBoolean(true) }, { "c", new PdfBoolean(false) } }),
+                new PdfDictionary(new Dictionary<string, PdfObject> { { "a", new PdfNull() }, { "b", new PdfBoolean(true) }, { "c", new PdfBoolean(false) } }),
+                comparer
+            );
+            Assert.NotEqual(
+                new PdfDictionary(new Dictionary<string, PdfObject> { { "a", new PdfNull() }, { "b", new PdfBoolean(true) }, { "c", new PdfBoolean(false) } }),
+                new PdfDictionary(new Dictionary<string, PdfObject> { { "a", new PdfNull() }, { "b", new PdfBoolean(true) } }),
+                comparer
+            );
+            Assert.NotEqual(
+                new PdfDictionary(new Dictionary<string, PdfObject> { { "a", new PdfNull() }, { "b", new PdfBoolean(true) }, { "c", new PdfBoolean(false) } }),
+                new PdfDictionary(new Dictionary<string, PdfObject> { { "a", new PdfNull() }, { "b", new PdfBoolean(true) }, { "d", new PdfBoolean(false) } }),
+                comparer
+            );
+            Assert.NotEqual(
+                new PdfDictionary(new Dictionary<string, PdfObject> { { "a", new PdfNull() }, { "b", new PdfBoolean(true) }, { "c", new PdfBoolean(false) } }),
+                new PdfDictionary(new Dictionary<string, PdfObject> { { "a", new PdfNull() }, { "b", new PdfBoolean(true) }, { "c", new PdfBoolean(true) } }),
+                comparer
+            );
+
+            // PdfIndirectObject
+            Assert.Equal(new PdfIndirectObject(123, 456, new PdfBoolean(true)), new PdfIndirectObject(123, 456, new PdfBoolean(true)), comparer);
+            Assert.NotEqual(new PdfIndirectObject(123, 456, new PdfBoolean(true)), new PdfIndirectObject(122, 456, new PdfBoolean(true)), comparer);
+            Assert.NotEqual(new PdfIndirectObject(123, 456, new PdfBoolean(true)), new PdfIndirectObject(123, 455, new PdfBoolean(true)), comparer);
+            Assert.NotEqual(new PdfIndirectObject(123, 456, new PdfBoolean(true)), new PdfIndirectObject(123, 456, new PdfBoolean(false)), comparer);
+
+            // PdfStream
+            PdfDictionary dictionary1 = new PdfDictionary(new Dictionary<string, PdfObject> { { "a", new PdfNull() }, { "b", new PdfBoolean(true) }, { "c", new PdfBoolean(false) } });
+            PdfStream stream1 = new PdfStream(123, 456, dictionary1, 789);
+
+            PdfDictionary dictionary2 = new PdfDictionary(new Dictionary<string, PdfObject> { { "a", new PdfNull() }, { "b", new PdfBoolean(true) }, { "c", new PdfBoolean(false) } });
+            PdfDictionary dictionary3 = new PdfDictionary(new Dictionary<string, PdfObject> { { "a", new PdfNull() }, { "b", new PdfBoolean(true) }, { "d", new PdfBoolean(false) } });
+
+            Assert.Equal(stream1, new PdfStream(123, 456, dictionary2, 789), comparer);
+            Assert.NotEqual(stream1, new PdfStream(122, 456, dictionary2, 789), comparer);
+            Assert.NotEqual(stream1, new PdfStream(123, 455, dictionary2, 789), comparer);
+            Assert.NotEqual(stream1, new PdfStream(123, 456, dictionary2, 788), comparer);
+            Assert.NotEqual(stream1, new PdfStream(123, 456, dictionary3, 789), comparer);
+        }
+
+        private static PdfString CreatePdfString(string value)
+        {
+            // NOTE: value should only contain 1-byte characters
+            return new PdfString(new StringValue(value.ToCharArray().Select(c => (byte)c).ToArray()));
+        }
+
+        private static PdfName CreatePdfName(string value)
+        {
+            // NOTE: value should only contain 1-byte characters
+            return new PdfName(new StringValue(value.ToCharArray().Select(c => (byte)c).ToArray()));
+        }
     }
 }
