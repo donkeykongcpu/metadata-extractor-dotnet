@@ -19,7 +19,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             return tokeniser;
         }
 
-        private class TokenEqualityComparer : IEqualityComparer<Token>
+        private class TokenEqualityComparer : IEqualityComparer<Token?>
         {
             public bool Equals(Token? token1, Token? token2)
             {
@@ -33,9 +33,24 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                     return false;
                 }
 
-                return token1.Type == token2.Type
-                    && token1.StartIndex == token2.StartIndex
-                    && token1.Value.EqualTo(token2.Value);
+                if (token1 is HeaderCommentToken commentToken1 && token2 is HeaderCommentToken commentToken2)
+                {
+                    return commentToken1.Type == commentToken2.Type
+                        && commentToken1.Version == commentToken2.Version
+                        && commentToken1.DecimalVersion == commentToken2.DecimalVersion
+                        && commentToken1.StartIndex == commentToken2.StartIndex
+                        && commentToken1.Value.EqualTo(commentToken2.Value);
+                }
+                else if (token1 is not HeaderCommentToken && token2 is not HeaderCommentToken)
+                {
+                    return token1.Type == token2.Type
+                       && token1.StartIndex == token2.StartIndex
+                       && token1.Value.EqualTo(token2.Value);
+                }
+                else
+                {
+                    return false;
+                }
             }
 
             public int GetHashCode(Token token) => token.Value.GetHashCode();
@@ -619,6 +634,27 @@ namespace MetadataExtractor.Tests.Formats.Pdf
             {
                 Assert.Equal(expected[i], actual[i], new TokenEqualityComparer());
             }
+        }
+
+        [Fact]
+        public void TestEquality()
+        {
+            TokenEqualityComparer comparer = new TokenEqualityComparer();
+
+            Assert.NotEqual(CreateStringToken("abc", 0), CreateNameToken("abc", 0), comparer);
+
+            // StringToken
+            Assert.Equal(CreateStringToken("abc", 0), CreateStringToken("abc", 0), comparer);
+            Assert.NotEqual(CreateStringToken("abc", 0), CreateStringToken("aBc", 0), comparer);
+            Assert.NotEqual(CreateStringToken("abc", 0), CreateStringToken("abcd", 0), comparer);
+            Assert.NotEqual(CreateStringToken("abc", 0), CreateStringToken("abc", 1), comparer);
+
+            // HeaderCommentToken
+            Assert.Equal(CreateHeaderCommentToken("abc", "1.0", 0), CreateHeaderCommentToken("abc", "1.0", 0), comparer);
+            Assert.NotEqual(CreateHeaderCommentToken("abc", "1.0", 0), CreateHeaderCommentToken("aBc", "1.0", 0), comparer);
+            Assert.NotEqual(CreateHeaderCommentToken("abc", "1.0", 0), CreateHeaderCommentToken("abcd", "1.0", 0), comparer);
+            Assert.NotEqual(CreateHeaderCommentToken("abc", "1.0", 0), CreateHeaderCommentToken("abc", "1.1", 0), comparer);
+            Assert.NotEqual(CreateHeaderCommentToken("abc", "1.0", 0), CreateHeaderCommentToken("abc", "1.0", 1), comparer);
         }
 
         private static StringToken CreateStringToken(string value, int startIndex)
