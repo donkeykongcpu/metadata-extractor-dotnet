@@ -190,6 +190,8 @@ namespace MetadataExtractor.Formats.Pdf
                     {
                         PdfStream pdfStream = new PdfStream(indirectObject.Identifier, streamDictionary, streamBeginToken.StreamStartIndex);
                         parseContext.ReplaceIndirectObjectValue(pdfStream);
+                        parseContext.EndContext("indirect-object");
+                        break;
                     }
                     else
                     {
