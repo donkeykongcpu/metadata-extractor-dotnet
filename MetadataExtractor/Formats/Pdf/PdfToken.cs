@@ -4,7 +4,7 @@ using System;
 
 namespace MetadataExtractor.Formats.Pdf
 {
-    public abstract class Token
+    public abstract class PdfToken
     {
         public abstract string Type { get; }
 
@@ -12,14 +12,14 @@ namespace MetadataExtractor.Formats.Pdf
 
         public int StartIndex { get; }
 
-        protected Token(byte[] value, int startIndex)
+        protected PdfToken(byte[] value, int startIndex)
         {
             Value = value;
 
             StartIndex = startIndex;
         }
 
-        protected Token(string value, int startIndex)
+        protected PdfToken(string value, int startIndex)
         {
             // value should only contain 1-byte characters
 
@@ -29,31 +29,31 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
-    public class DummyToken : Token
+    public class DummyToken : PdfToken
     {
         public override string Type => "dummy";
         public DummyToken() : base("dummy", -1) { }
     }
 
-    public class IndirectReferenceMarkerToken : Token
+    public class IndirectReferenceMarkerToken : PdfToken
     {
         public override string Type => "R";
         public IndirectReferenceMarkerToken(int startIndex) : base("R", startIndex) { }
     }
 
-    public class IndirectObjectBeginToken : Token
+    public class IndirectObjectBeginToken : PdfToken
     {
         public override string Type => "obj";
         public IndirectObjectBeginToken(int startIndex) : base("obj", startIndex) { }
     }
 
-    public class IndirectObjectEndToken : Token
+    public class IndirectObjectEndToken : PdfToken
     {
         public override string Type => "endobj";
         public IndirectObjectEndToken(int startIndex) : base("endobj", startIndex) { }
     }
 
-    public class StreamBeginToken : Token
+    public class StreamBeginToken : PdfToken
     {
         public int StreamStartIndex { get; }
 
@@ -65,7 +65,7 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
-    public class NullToken : Token
+    public class NullToken : PdfToken
     {
         public override string Type => "null";
         public NullToken(int startIndex) : base("null", startIndex) { }
@@ -75,7 +75,7 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
-    public class BooleanToken : Token
+    public class BooleanToken : PdfToken
     {
         public bool BooleanValue { get; }
 
@@ -92,7 +92,7 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
-    public class NumericIntegerToken : Token
+    public class NumericIntegerToken : PdfToken
     {
         public int IntegerValue { get; }
 
@@ -109,7 +109,7 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
-    public class NumericRealToken : Token
+    public class NumericRealToken : PdfToken
     {
         public decimal RealValue { get; }
 
@@ -126,31 +126,31 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
-    public class ArrayBeginToken : Token
+    public class ArrayBeginToken : PdfToken
     {
         public override string Type => "array-begin";
         public ArrayBeginToken(int startIndex) : base("[", startIndex) { }
     }
 
-    public class ArrayEndToken : Token
+    public class ArrayEndToken : PdfToken
     {
         public override string Type => "array-end";
         public ArrayEndToken(int startIndex) : base("]", startIndex) { }
     }
 
-    public class DictionaryBeginToken : Token
+    public class DictionaryBeginToken : PdfToken
     {
         public override string Type => "dictionary-begin";
         public DictionaryBeginToken(int startIndex) : base("<<", startIndex) { }
     }
 
-    public class DictionaryEndToken : Token
+    public class DictionaryEndToken : PdfToken
     {
         public override string Type => "dictionary-end";
         public DictionaryEndToken(int startIndex) : base(">>", startIndex) { }
     }
 
-    public class StringToken : Token
+    public class StringToken : PdfToken
     {
         public override string Type => "string";
 
@@ -168,7 +168,7 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
-    public class NameToken : Token
+    public class NameToken : PdfToken
     {
         public override string Type => "name";
 
@@ -188,7 +188,7 @@ namespace MetadataExtractor.Formats.Pdf
         }
     }
 
-    public class CommentToken : Token
+    public class CommentToken : PdfToken
     {
         public override string Type => "comment";
 
