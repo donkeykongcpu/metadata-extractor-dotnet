@@ -8,13 +8,13 @@ namespace MetadataExtractor.Tests.Formats.Pdf
     /// <author>Drew Noakes https://drewnoakes.com</author>
     public sealed class PdfParserTest
     {
-        private static PdfObject ParseTokens(IEnumerable<Token> tokens)
+        private static T ParseObject<T>(IEnumerable<Token> tokens) where T : PdfObject
         {
             EnumeratedItemProviderSource<Token> tokenSource = new EnumeratedItemProviderSource<Token>(tokens, new DummyToken());
 
             ItemProvider<Token> tokenProvider = new BufferedItemProvider<Token>(tokenSource, 5);
 
-            return PdfParser.ParseObject(tokenProvider);
+            return PdfParser.ParseObject<T>(tokenProvider);
         }
 
         private class PdfObjectEqualityComparer : IEqualityComparer<PdfObject?>
@@ -58,18 +58,18 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                 }
                 else if (object1 is PdfArray array1 && object2 is PdfArray array2)
                 {
-                    return array1.Value.SequenceEqual(array2.Value, this);
+                    return array1.GetValue().SequenceEqual(array2.GetValue(), this);
                 }
                 else if (object1 is PdfDictionary dictionary1 && object2 is PdfDictionary dictionary2)
                 {
-                    return dictionary1.Value.Keys.Count == dictionary2.Value.Keys.Count
-                        && dictionary1.Value.All(item => dictionary2.Value.ContainsKey(item.Key) && Equals(item.Value, dictionary2.Value[item.Key]));
+                    return dictionary1.GetValue().Keys.Count == dictionary2.GetValue().Keys.Count
+                        && dictionary1.GetValue().All(item => dictionary2.GetValue().ContainsKey(item.Key) && Equals(item.Value, dictionary2.GetValue()[item.Key]));
                 }
                 else if (object1 is PdfIndirectObject indirect1 && object2 is PdfIndirectObject indirect2)
                 {
                     return indirect1.Identifier.ObjectNumber == indirect2.Identifier.ObjectNumber
                         && indirect1.Identifier.GenerationNumber == indirect2.Identifier.GenerationNumber
-                        && Equals(indirect1.Value, indirect2.Value);
+                        && Equals(indirect1.GetValue(), indirect2.GetValue());
                 }
                 else if (object1 is PdfStream stream1 && object2 is PdfStream stream2)
                 {
@@ -99,9 +99,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                 new NullToken(2),
             };
 
-            PdfObject actual = ParseTokens(tokens);
+            PdfBoolean actual = ParseObject<PdfBoolean>(tokens);
 
-            PdfObject expected = new PdfBoolean(true);
+            PdfBoolean expected = new PdfBoolean(true);
 
             Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
         }
@@ -115,9 +115,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                 new NullToken(2),
             };
 
-            PdfObject actual = ParseTokens(tokens);
+            PdfBoolean actual = ParseObject<PdfBoolean>(tokens);
 
-            PdfObject expected = new PdfBoolean(false);
+            PdfBoolean expected = new PdfBoolean(false);
 
             Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
         }
@@ -131,9 +131,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                 new BooleanToken(true, 2),
             };
 
-            PdfObject actual = ParseTokens(tokens);
+            PdfNull actual = ParseObject<PdfNull>(tokens);
 
-            PdfObject expected = new PdfNull();
+            PdfNull expected = new PdfNull();
 
             Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
         }
@@ -151,9 +151,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                 new CommentToken(new byte[] { 1, 2, 3 }, 6),
             };
 
-            PdfObject actual = ParseTokens(tokens);
+            PdfBoolean actual = ParseObject<PdfBoolean>(tokens);
 
-            PdfObject expected = new PdfBoolean(true);
+            PdfBoolean expected = new PdfBoolean(true);
 
             Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
         }
@@ -167,9 +167,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                 new BooleanToken(true, 2),
             };
 
-            PdfObject actual = ParseTokens(tokens);
+            PdfNumericInteger actual = ParseObject<PdfNumericInteger>(tokens);
 
-            PdfObject expected = new PdfNumericInteger(123);
+            PdfNumericInteger expected = new PdfNumericInteger(123);
 
             Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
         }
@@ -183,9 +183,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                 new BooleanToken(true, 2),
             };
 
-            PdfObject actual = ParseTokens(tokens);
+            PdfNumericReal actual = ParseObject<PdfNumericReal>(tokens);
 
-            PdfObject expected = new PdfNumericReal(3.14m);
+            PdfNumericReal expected = new PdfNumericReal(3.14m);
 
             Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
         }
@@ -199,9 +199,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                 new BooleanToken(true, 2),
             };
 
-            PdfObject actual = ParseTokens(tokens);
+            PdfString actual = ParseObject<PdfString>(tokens);
 
-            PdfObject expected = CreatePdfString("aBcD");
+            PdfString expected = CreatePdfString("aBcD");
 
             Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
         }
@@ -215,9 +215,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                 new BooleanToken(true, 2),
             };
 
-            PdfObject actual = ParseTokens(tokens);
+            PdfName actual = ParseObject<PdfName>(tokens);
 
-            PdfObject expected = CreatePdfName("aBcD");
+            PdfName expected = CreatePdfName("aBcD");
 
             Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
         }
@@ -233,9 +233,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                 new BooleanToken(true, 4),
             };
 
-            PdfObject actual = ParseTokens(tokens);
+            PdfIndirectReference actual = ParseObject<PdfIndirectReference>(tokens);
 
-            PdfObject expected = new PdfIndirectReference(123, 456);
+            PdfIndirectReference expected = new PdfIndirectReference(123, 456);
 
             Assert.Equal(expected, actual, new PdfObjectEqualityComparer());
         }
@@ -254,9 +254,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                 new ArrayEndToken(7),
             };
 
-            PdfObject actual = ParseTokens(tokens);
+            PdfArray actual = ParseObject<PdfArray>(tokens);
 
-            PdfObject expected = new PdfArray(new List<PdfObject>
+            PdfArray expected = new PdfArray(new List<PdfObject>
             {
                 new PdfIndirectReference(123, 456),
                 CreatePdfString("aBcD"),
@@ -279,9 +279,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                 new DictionaryEndToken(6),
             };
 
-            PdfObject actual = ParseTokens(tokens);
+            PdfDictionary actual = ParseObject<PdfDictionary>(tokens);
 
-            PdfObject expected = new PdfDictionary(new Dictionary<string, PdfObject>
+            PdfDictionary expected = new PdfDictionary(new Dictionary<string, PdfObject>
             {
                 { "Key1", new PdfNumericInteger(123) },
                 { "Key2", new PdfBoolean(true) },
@@ -313,9 +313,9 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                 new DictionaryEndToken(20),
             };
 
-            PdfObject actual = ParseTokens(tokens);
+            PdfDictionary actual = ParseObject<PdfDictionary>(tokens);
 
-            PdfObject expected = new PdfDictionary(new Dictionary<string, PdfObject>
+            PdfDictionary expected = new PdfDictionary(new Dictionary<string, PdfObject>
             {
                 { "Key1", new PdfNumericInteger(123) },
                 { "Key2", new PdfBoolean(true) },
@@ -349,7 +349,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                 new IndirectObjectEndToken(20),
             };
 
-            PdfObject actual = ParseTokens(tokens);
+            PdfIndirectObject actual = ParseObject<PdfIndirectObject>(tokens);
 
             PdfIndirectObject expected = new PdfIndirectObject(123, 456, new PdfDictionary(new Dictionary<string, PdfObject>
             {
@@ -381,7 +381,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
                 new IndirectObjectEndToken(30),
             };
 
-            PdfObject actual = ParseTokens(tokens);
+            PdfIndirectObject actual = ParseObject<PdfIndirectObject>(tokens);
 
             PdfIndirectObject expected = new PdfIndirectObject(123, 456);
 
@@ -414,7 +414,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             Assert.ThrowsAny<Exception>(() =>
             {
-                _ = ParseTokens(tokens);
+                _ = ParseObject<PdfObject>(tokens);
             });
         }
 
@@ -441,7 +441,7 @@ namespace MetadataExtractor.Tests.Formats.Pdf
 
             Assert.ThrowsAny<Exception>(() =>
             {
-                _ = ParseTokens(tokens);
+                _ = ParseObject<PdfObject>(tokens);
             });
         }
 
